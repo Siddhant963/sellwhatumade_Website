@@ -5,10 +5,17 @@ import Footer from "@/components/Footer";
 import ProductCard from "@/components/ProductCard";
 import ArtisanCard from "@/components/ArtisanCard";
 import TestimonialCard from "@/components/TestimonialCard";
-import { products, categories, artisans, testimonials } from "@/lib/data";
+import { categories, artisans, testimonials } from "@/lib/data";
+import { serverFetchOrNull } from "@/lib/api/server";
+import { productToCard } from "@/lib/mappers";
+import type { PaginatedResult, Product } from "@/lib/api/types";
 
-export default function HomePage() {
-  const featuredProducts = products.filter((p) => p.isFeatured).slice(0, 4);
+export default async function HomePage() {
+  const featured = await serverFetchOrNull<PaginatedResult<Product>>(
+    "/api/v1/products?sort=popular&limit=4",
+    { cache: "no-store" },
+  );
+  const featuredProducts = (featured?.data ?? []).map((p) => productToCard(p));
 
   return (
     <>
@@ -38,19 +45,20 @@ export default function HomePage() {
                 </p>
               </div>
 
-              <div className="flex gap-2 bg-white border border-[#d8c3b4] rounded-2xl p-2 shadow-artisan max-w-lg">
+              <form action="/marketplace" method="get" className="flex gap-2 bg-white border border-[#d8c3b4] rounded-2xl p-2 shadow-artisan max-w-lg">
                 <div className="flex-1 relative">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#857467]" />
                   <input
                     type="text"
+                    name="q"
                     placeholder="Search pottery, silk, wood craft..."
                     className="w-full pl-9 pr-3 py-2.5 text-sm bg-transparent focus:outline-none placeholder:text-[#857467] text-[#1b1c1a]"
                   />
                 </div>
-                <Link href="/marketplace" className="btn-press px-5 py-2.5 bg-[#8d4f11] text-white text-sm font-semibold rounded-xl hover:bg-[#6e3900] transition-colors">
+                <button type="submit" className="btn-press px-5 py-2.5 bg-[#8d4f11] text-white text-sm font-semibold rounded-xl hover:bg-[#6e3900] transition-colors">
                   Search
-                </Link>
-              </div>
+                </button>
+              </form>
 
               <div className="flex flex-wrap gap-4">
                 {[
@@ -159,25 +167,27 @@ export default function HomePage() {
         </section>
 
         {/* Featured Products */}
-        <section className="bg-[#f5f3ef] py-20">
-          <div className="max-w-7xl mx-auto px-6">
-            <div className="flex items-end justify-between mb-10">
-              <div>
-                <p className="text-sm font-semibold text-[#8d4f11] uppercase tracking-widest mb-2">Handpicked</p>
-                <h2 className="text-3xl font-bold text-[#1b1c1a]">Featured Masterpieces</h2>
+        {featuredProducts.length > 0 && (
+          <section className="bg-[#f5f3ef] py-20">
+            <div className="max-w-7xl mx-auto px-6">
+              <div className="flex items-end justify-between mb-10">
+                <div>
+                  <p className="text-sm font-semibold text-[#8d4f11] uppercase tracking-widest mb-2">Handpicked</p>
+                  <h2 className="text-3xl font-bold text-[#1b1c1a]">Featured Masterpieces</h2>
+                </div>
+                <Link href="/marketplace" className="flex items-center gap-1 text-sm font-semibold text-[#8d4f11] hover:gap-2 transition-all">
+                  Browse all <ArrowRight size={15} />
+                </Link>
               </div>
-              <Link href="/marketplace" className="flex items-center gap-1 text-sm font-semibold text-[#8d4f11] hover:gap-2 transition-all">
-                Browse all <ArrowRight size={15} />
-              </Link>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {featuredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {featuredProducts.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* Artisan Spotlight */}
         <section className="max-w-7xl mx-auto px-6 py-20">

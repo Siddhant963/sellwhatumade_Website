@@ -1,7 +1,10 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { Leaf, Eye, EyeOff, Mail, Lock, User, Phone, ShoppingBag, Store, ChevronDown } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Leaf, Eye, EyeOff, Mail, Lock, User, Phone, ShoppingBag, Store, ChevronDown, Loader2 } from "lucide-react";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { BACKEND_URL } from "@/lib/api/config";
 
 const crafts = [
   "Textiles & Weaving", "Pottery & Ceramics", "Paintings & Art", "Metal Craft",
@@ -9,9 +12,38 @@ const crafts = [
 ];
 
 export default function SignupPage() {
+  const router = useRouter();
+  const { signup } = useAuth();
   const [role, setRole] = useState<"buyer" | "seller">("buyer");
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", password: "", craft: "" });
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const update = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const user = await signup({
+        fullName: form.name,
+        email: form.email,
+        phone: form.phone ? `+91${form.phone.replace(/\D/g, "")}` : undefined,
+        password: form.password,
+        role: role === "seller" ? "seller" : "user",
+        craftCategory: role === "seller" ? form.craft || undefined : undefined,
+      });
+      if (user.role === "seller") router.push("/seller/onboarding");
+      else router.push("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create your account.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex">
@@ -102,7 +134,13 @@ export default function SignupPage() {
           </div>
 
           {/* Google OAuth */}
-          <button className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-[#d8c3b4] rounded-2xl text-sm font-semibold text-[#1b1c1a] hover:border-[#f4a460] transition-colors mb-5 shadow-sm">
+          <button
+            type="button"
+            onClick={() => {
+              window.location.href = `${BACKEND_URL}/auth/google`;
+            }}
+            className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-[#d8c3b4] rounded-2xl text-sm font-semibold text-[#1b1c1a] hover:border-[#f4a460] transition-colors mb-5 shadow-sm"
+          >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <path d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z" fill="#4285F4"/>
               <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z" fill="#34A853"/>
@@ -118,13 +156,21 @@ export default function SignupPage() {
             <div className="flex-1 h-px bg-[#d8c3b4]" />
           </div>
 
-          <form className="flex flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
+          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+            {error && (
+              <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-[#534439]">Full Name</label>
               <div className="relative">
                 <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#857467]" />
                 <input
                   type="text"
+                  required
+                  value={form.name}
+                  onChange={update("name")}
                   placeholder="Your full name"
                   className="w-full pl-10 pr-4 py-3 bg-white border border-[#d8c3b4] rounded-xl text-sm focus:outline-none focus:border-[#f4a460] placeholder:text-[#857467]"
                 />
@@ -137,6 +183,9 @@ export default function SignupPage() {
                 <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#857467]" />
                 <input
                   type="email"
+                  required
+                  value={form.email}
+                  onChange={update("email")}
                   placeholder="you@example.com"
                   className="w-full pl-10 pr-4 py-3 bg-white border border-[#d8c3b4] rounded-xl text-sm focus:outline-none focus:border-[#f4a460] placeholder:text-[#857467]"
                 />
@@ -154,6 +203,8 @@ export default function SignupPage() {
                   <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#857467]" />
                   <input
                     type="tel"
+                    value={form.phone}
+                    onChange={update("phone")}
                     placeholder="10-digit mobile"
                     className="w-full pl-10 pr-4 py-3 bg-white border border-[#d8c3b4] rounded-xl text-sm focus:outline-none focus:border-[#f4a460] placeholder:text-[#857467]"
                   />
@@ -165,7 +216,11 @@ export default function SignupPage() {
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-[#534439]">Primary Craft</label>
                 <div className="relative">
-                  <select className="w-full pl-4 pr-10 py-3 bg-white border border-[#d8c3b4] rounded-xl text-sm text-[#1b1c1a] focus:outline-none focus:border-[#f4a460] appearance-none">
+                  <select
+                    value={form.craft}
+                    onChange={update("craft")}
+                    className="w-full pl-4 pr-10 py-3 bg-white border border-[#d8c3b4] rounded-xl text-sm text-[#1b1c1a] focus:outline-none focus:border-[#f4a460] appearance-none"
+                  >
                     <option value="">Select your craft</option>
                     {crafts.map((c) => (
                       <option key={c} value={c}>{c}</option>
@@ -182,7 +237,10 @@ export default function SignupPage() {
                 <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#857467]" />
                 <input
                   type={showPassword ? "text" : "password"}
-                  placeholder="At least 8 characters"
+                  required
+                  value={form.password}
+                  onChange={update("password")}
+                  placeholder="8+ chars, upper, lower, digit & symbol"
                   className="w-full pl-10 pr-10 py-3 bg-white border border-[#d8c3b4] rounded-xl text-sm focus:outline-none focus:border-[#f4a460] placeholder:text-[#857467]"
                 />
                 <button
@@ -204,9 +262,11 @@ export default function SignupPage() {
 
             <button
               type="submit"
-              className="btn-press w-full py-3.5 bg-[#8d4f11] hover:bg-[#6e3900] text-white font-bold rounded-2xl transition-colors mt-1"
+              disabled={submitting}
+              className="btn-press w-full py-3.5 bg-[#8d4f11] hover:bg-[#6e3900] text-white font-bold rounded-2xl transition-colors mt-1 flex items-center justify-center gap-2 disabled:opacity-60"
             >
-              Create Account
+              {submitting && <Loader2 size={18} className="animate-spin" />}
+              {submitting ? "Creating account…" : "Create Account"}
             </button>
           </form>
 

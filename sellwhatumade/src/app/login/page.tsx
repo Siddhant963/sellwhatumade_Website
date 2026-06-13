@@ -1,12 +1,46 @@
 "use client";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { Leaf, Eye, EyeOff, Mail, Lock, ShieldCheck, BadgeCheck, Truck } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Leaf, Eye, EyeOff, Mail, Lock, ShieldCheck, BadgeCheck, Truck, Loader2 } from "lucide-react";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { BACKEND_URL } from "@/lib/api/config";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#fbf9f5]" />}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const user = await login(email, password);
+      const next = searchParams.get("next");
+      if (next) router.push(next);
+      else if (user.role === "admin") router.push("/admin/dashboard");
+      else if (user.role === "seller") router.push("/seller/dashboard");
+      else router.push("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not sign in. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex">
@@ -74,7 +108,13 @@ export default function LoginPage() {
           </div>
 
           {/* Google OAuth */}
-          <button className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-[#d8c3b4] rounded-2xl text-sm font-semibold text-[#1b1c1a] hover:border-[#f4a460] transition-colors mb-6 shadow-sm">
+          <button
+            type="button"
+            onClick={() => {
+              window.location.href = `${BACKEND_URL}/auth/google`;
+            }}
+            className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-[#d8c3b4] rounded-2xl text-sm font-semibold text-[#1b1c1a] hover:border-[#f4a460] transition-colors mb-6 shadow-sm"
+          >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <path d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z" fill="#4285F4"/>
               <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z" fill="#34A853"/>
@@ -90,7 +130,12 @@ export default function LoginPage() {
             <div className="flex-1 h-px bg-[#d8c3b4]" />
           </div>
 
-          <form className="flex flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
+          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+            {error && (
+              <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-[#534439]">Email address</label>
               <div className="relative">
@@ -133,9 +178,11 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="btn-press w-full py-3.5 bg-[#8d4f11] hover:bg-[#6e3900] text-white font-bold rounded-2xl transition-colors mt-2"
+              disabled={submitting}
+              className="btn-press w-full py-3.5 bg-[#8d4f11] hover:bg-[#6e3900] text-white font-bold rounded-2xl transition-colors mt-2 flex items-center justify-center gap-2 disabled:opacity-60"
             >
-              Sign In
+              {submitting && <Loader2 size={18} className="animate-spin" />}
+              {submitting ? "Signing in…" : "Sign In"}
             </button>
           </form>
 

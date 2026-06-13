@@ -1,11 +1,27 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { Leaf, Mail, ArrowLeft, CheckCircle } from "lucide-react";
+import { Leaf, Mail, ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
+import { api } from "@/lib/api/client";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await api.post("/auth/forgot-password", { email });
+      setSent(true);
+    } catch {
+      // Backend intentionally returns success regardless; treat as sent.
+      setSent(true);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#fbf9f5] flex items-center justify-center px-6 py-12">
@@ -56,7 +72,7 @@ export default function ForgotPasswordPage() {
               </p>
             </div>
 
-            <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); setSent(true); }}>
+            <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-[#534439]">Email address</label>
                 <div className="relative">
@@ -74,9 +90,11 @@ export default function ForgotPasswordPage() {
 
               <button
                 type="submit"
-                className="btn-press w-full py-3.5 bg-[#8d4f11] hover:bg-[#6e3900] text-white font-bold rounded-2xl transition-colors mt-2"
+                disabled={submitting}
+                className="btn-press w-full py-3.5 bg-[#8d4f11] hover:bg-[#6e3900] text-white font-bold rounded-2xl transition-colors mt-2 flex items-center justify-center gap-2 disabled:opacity-60"
               >
-                Send Reset Link
+                {submitting && <Loader2 size={18} className="animate-spin" />}
+                {submitting ? "Sending…" : "Send Reset Link"}
               </button>
             </form>
 

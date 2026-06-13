@@ -1,89 +1,81 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Package, Truck, CheckCircle, Clock, XCircle, ChevronRight, Star, RotateCcw } from "lucide-react";
+import { Truck, Star, RotateCcw, XCircle, ChevronRight, Package, Loader2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { api } from "@/lib/api/client";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { statusMeta } from "@/lib/orders";
+import { formatPaise, formatDate } from "@/lib/format";
+import { PLACEHOLDER_IMAGE } from "@/lib/mappers";
+import type { Order, OrderStatus, PaginatedResult } from "@/lib/api/types";
 
-const allOrders = [
-  {
-    id: "AD-9301",
-    product: "Hand-Painted Blue Pottery Vase",
-    artisan: "Laxman Singh",
-    image: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=160&q=80",
-    price: 3450,
-    quantity: 1,
-    status: "Delivered",
-    date: "2024-06-01",
-    deliveredDate: "2024-06-06",
-  },
-  {
-    id: "AD-9284",
-    product: "Banarasi Silk Stole – Sunset Bloom",
-    artisan: "Kamala Devi",
-    image: "https://images.unsplash.com/photo-1558769132-cb1aea458c5e?w=160&q=80",
-    price: 5800,
-    quantity: 1,
-    status: "Shipped",
-    date: "2024-06-05",
-    deliveredDate: null,
-  },
-  {
-    id: "AD-9271",
-    product: "Dhokra Brass Elephant Figurine",
-    artisan: "Raju Mistri",
-    image: "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=160&q=80",
-    price: 2100,
-    quantity: 2,
-    status: "Processing",
-    date: "2024-06-07",
-    deliveredDate: null,
-  },
-  {
-    id: "AD-9265",
-    product: "Madhubani Painting – Peacock Dance",
-    artisan: "Sunita Devi",
-    image: "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=160&q=80",
-    price: 6200,
-    quantity: 1,
-    status: "Pending",
-    date: "2024-06-08",
-    deliveredDate: null,
-  },
-  {
-    id: "AD-9200",
-    product: "Terracotta Wind Chime",
-    artisan: "Priya Kumari",
-    image: "https://images.unsplash.com/photo-1525909002-1b05e0c869d8?w=160&q=80",
-    price: 890,
-    quantity: 3,
-    status: "Cancelled",
-    date: "2024-05-28",
-    deliveredDate: null,
-  },
+const TAB_FILTERS: { key: string; statuses: OrderStatus[] | null }[] = [
+  { key: "All", statuses: null },
+  { key: "Active", statuses: ["confirmed", "processing", "shipped", "out_for_delivery"] },
+  { key: "Delivered", statuses: ["delivered"] },
+  { key: "Returns", statuses: ["return_requested", "return_approved", "returned", "refunded"] },
+  { key: "Cancelled", statuses: ["cancelled", "payment_failed"] },
 ];
-
-const tabs = [
-  { key: "All", count: 12 },
-  { key: "Pending", count: 2 },
-  { key: "Processing", count: 1 },
-  { key: "Shipped", count: 3 },
-  { key: "Delivered", count: 5 },
-  { key: "Cancelled", count: 1 },
-];
-
-const statusConfig: Record<string, { color: string; bg: string; icon: React.ComponentType<{ size: number; className?: string }> }> = {
-  Pending: { color: "text-amber-700", bg: "bg-amber-50", icon: Clock },
-  Processing: { color: "text-blue-700", bg: "bg-blue-50", icon: Package },
-  Shipped: { color: "text-purple-700", bg: "bg-purple-50", icon: Truck },
-  Delivered: { color: "text-[#006d3d]", bg: "bg-[#006d3d]/10", icon: CheckCircle },
-  Cancelled: { color: "text-red-600", bg: "bg-red-50", icon: XCircle },
-};
 
 export default function OrdersPage() {
+  const { isAuthenticated, loading: authLoading } = useAuth();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("All");
+  const [busy, setBusy] = useState<string | null>(null);
 
-  const filtered = activeTab === "All" ? allOrders : allOrders.filter((o) => o.status === activeTab);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get<PaginatedResult<Order>>("/buyer/v1/orders", { query: { limit: 50 } });
+      setOrders(res.data ?? []);
+    } catch {
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (isAuthenticated) void load();
+    else setLoading(false);
+  }, [authLoading, isAuthenticated, load]);
+
+  const cancelOrder = async (id: string) => {
+    setBusy(id);
+    try {
+      await api.post(`/buyer/v1/orders/${id}/cancel`, { reason: "Changed my mind" });
+      await load();
+    } catch {
+      /* ignore */
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const activeFilter = TAB_FILTERS.find((t) => t.key === activeTab)!;
+  const filtered = activeFilter.statuses
+    ? orders.filter((o) => activeFilter.statuses!.includes(o.status))
+    : orders;
+
+  if (!authLoading && !isAuthenticated) {
+    return (
+      <>
+        <Navbar />
+        <main className="flex-1 flex flex-col items-center justify-center py-32 text-center px-6">
+          <Package size={48} className="text-[#d8c3b4] mb-4" />
+          <h1 className="text-2xl font-bold text-[#1b1c1a] mb-2">Sign in to view your orders</h1>
+          <Link href="/login?next=/orders" className="mt-4 px-6 py-3 bg-[#8d4f11] text-white font-semibold rounded-2xl">
+            Sign in
+          </Link>
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
   return (
     <>
@@ -95,106 +87,127 @@ export default function OrdersPage() {
             <p className="text-sm text-[#857467] mt-1">Track and manage your craft purchases</p>
           </div>
 
-          {/* Tabs */}
           <div className="flex gap-1 overflow-x-auto pb-1 mb-6 no-scrollbar">
-            {tabs.map(({ key, count }) => (
+            {TAB_FILTERS.map(({ key }) => (
               <button
                 key={key}
                 onClick={() => setActiveTab(key)}
-                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
+                className={`px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
                   activeTab === key
                     ? "bg-[#8d4f11] text-white"
                     : "bg-white text-[#534439] border border-[#e4e2de] hover:border-[#f4a460]"
                 }`}
               >
                 {key}
-                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                  activeTab === key ? "bg-white/20 text-white" : "bg-[#efeeea] text-[#857467]"
-                }`}>
-                  {count}
-                </span>
               </button>
             ))}
           </div>
 
-          {/* Orders */}
-          <div className="flex flex-col gap-4">
-            {filtered.map((order) => {
-              const cfg = statusConfig[order.status];
-              const Icon = cfg.icon;
-              return (
-                <div key={order.id} className="bg-white rounded-2xl shadow-artisan overflow-hidden">
-                  <div className="flex items-center justify-between px-5 py-3 border-b border-[#f0ede9]">
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-[#534439]">Order #{order.id}</span>
-                      <span className="text-xs text-[#857467]">{order.date}</span>
+          {loading ? (
+            <div className="flex items-center justify-center py-24 text-[#857467]">
+              <Loader2 className="animate-spin mr-2" /> Loading orders…
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <Package size={48} className="text-[#d8c3b4] mb-4" />
+              <h2 className="text-xl font-bold text-[#1b1c1a] mb-2">No orders here yet</h2>
+              <p className="text-[#857467] mb-6">When you place an order it will appear here.</p>
+              <Link href="/marketplace" className="px-6 py-3 bg-[#8d4f11] text-white font-semibold rounded-2xl">
+                Start shopping
+              </Link>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {filtered.map((order) => {
+                const cfg = statusMeta(order.status);
+                const Icon = cfg.icon;
+                const first = order.items[0];
+                const extra = order.items.length - 1;
+                return (
+                  <div key={order._id} className="bg-white rounded-2xl shadow-artisan overflow-hidden">
+                    <div className="flex items-center justify-between px-5 py-3 border-b border-[#f0ede9]">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-[#534439]">#{order.orderNumber}</span>
+                        <span className="text-xs text-[#857467]">{formatDate(order.createdAt)}</span>
+                      </div>
+                      <span className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${cfg.color} ${cfg.bg}`}>
+                        <Icon size={12} className={cfg.color} />
+                        {cfg.label}
+                      </span>
                     </div>
-                    <span className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${cfg.color} ${cfg.bg}`}>
-                      <Icon size={12} className={cfg.color} />
-                      {order.status}
-                    </span>
-                  </div>
 
-                  <div className="flex items-center gap-4 p-5">
-                    <img
-                      src={order.image}
-                      alt={order.product}
-                      className="w-20 h-20 rounded-xl object-cover shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-[#1b1c1a] text-sm leading-snug line-clamp-1">
-                        {order.product}
-                      </h3>
-                      <p className="text-xs text-[#8d4f11] font-medium mt-0.5">By {order.artisan}</p>
-                      <p className="text-xs text-[#857467] mt-1">
-                        Qty: {order.quantity} · ₹{(order.price * order.quantity).toLocaleString("en-IN")}
-                      </p>
-                      {order.deliveredDate && (
-                        <p className="text-xs text-[#006d3d] mt-1">Delivered on {order.deliveredDate}</p>
-                      )}
+                    <div className="flex items-center gap-4 p-5">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={first?.image || PLACEHOLDER_IMAGE}
+                        alt={first?.name || "Order item"}
+                        className="w-20 h-20 rounded-xl object-cover shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-[#1b1c1a] text-sm leading-snug line-clamp-1">
+                          {first?.name}
+                          {extra > 0 && <span className="text-[#857467] font-normal"> +{extra} more</span>}
+                        </h3>
+                        <p className="text-xs text-[#857467] mt-1">
+                          {order.items.length} {order.items.length === 1 ? "item" : "items"} · {formatPaise(order.totalPaise)}
+                        </p>
+                        {order.deliveredAt && (
+                          <p className="text-xs text-[#006d3d] mt-1">Delivered on {formatDate(order.deliveredAt)}</p>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex gap-2 px-5 pb-4">
-                    {order.status === "Shipped" && (
-                      <Link
-                        href={`/orders/${order.id}/tracking`}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-[#8d4f11] text-white text-xs font-semibold rounded-xl hover:bg-[#6e3900] transition-colors"
-                      >
-                        <Truck size={13} />
-                        Track Order
-                      </Link>
-                    )}
-                    {order.status === "Delivered" && (
-                      <>
-                        <button className="flex items-center gap-1.5 px-4 py-2 bg-[#8d4f11] text-white text-xs font-semibold rounded-xl hover:bg-[#6e3900] transition-colors">
-                          <Star size={13} />
-                          Write Review
-                        </button>
+                    <div className="flex gap-2 px-5 pb-4 flex-wrap">
+                      {(order.status === "shipped" || order.status === "out_for_delivery") && (
                         <Link
-                          href="/returns"
-                          className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#d8c3b4] text-[#534439] text-xs font-semibold rounded-xl hover:border-[#f4a460] transition-colors"
+                          href={`/orders/${order._id}`}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-[#8d4f11] text-white text-xs font-semibold rounded-xl hover:bg-[#6e3900] transition-colors"
                         >
-                          <RotateCcw size={13} />
-                          Return
+                          <Truck size={13} />
+                          Track Order
                         </Link>
-                      </>
-                    )}
-                    {(order.status === "Pending" || order.status === "Processing") && (
-                      <button className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#d8c3b4] text-[#534439] text-xs font-semibold rounded-xl hover:border-red-300 transition-colors">
-                        <XCircle size={13} />
-                        Cancel Order
-                      </button>
-                    )}
-                    <button className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#d8c3b4] text-[#534439] text-xs font-semibold rounded-xl hover:border-[#f4a460] transition-colors ml-auto">
-                      Details
-                      <ChevronRight size={13} />
-                    </button>
+                      )}
+                      {order.status === "delivered" && (
+                        <>
+                          <Link
+                            href={`/product/${first?.productId}#review`}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-[#8d4f11] text-white text-xs font-semibold rounded-xl hover:bg-[#6e3900] transition-colors"
+                          >
+                            <Star size={13} />
+                            Write Review
+                          </Link>
+                          <Link
+                            href={`/returns?order=${order._id}`}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#d8c3b4] text-[#534439] text-xs font-semibold rounded-xl hover:border-[#f4a460] transition-colors"
+                          >
+                            <RotateCcw size={13} />
+                            Return
+                          </Link>
+                        </>
+                      )}
+                      {(order.status === "confirmed" || order.status === "processing" || order.status === "pending_payment") && (
+                        <button
+                          onClick={() => cancelOrder(order._id)}
+                          disabled={busy === order._id}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#d8c3b4] text-[#534439] text-xs font-semibold rounded-xl hover:border-red-300 transition-colors disabled:opacity-50"
+                        >
+                          <XCircle size={13} />
+                          Cancel Order
+                        </button>
+                      )}
+                      <Link
+                        href={`/orders/${order._id}`}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#d8c3b4] text-[#534439] text-xs font-semibold rounded-xl hover:border-[#f4a460] transition-colors ml-auto"
+                      >
+                        Details
+                        <ChevronRight size={13} />
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </main>
       <Footer />
