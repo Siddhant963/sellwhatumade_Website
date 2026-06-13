@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #8d4f11;
+  --color-primary-container: #f4a460;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #6e3900;
+  --color-secondary: #006d3d;
+  --color-secondary-container: #97f3b5;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #047240;
+  --color-tertiary: #934b19;
+  --color-tertiary-container: #fc9f66;
+  --color-surface: #fbf9f5;
+  --color-surface-low: #f5f3ef;
+  --color-surface-container: #efeeea;
+  --color-surface-high: #eae8e4;
+  --color-surface-highest: #e4e2de;
+  --color-surface-lowest: #ffffff;
+  --color-on-surface: #1b1c1a;
+  --color-on-surface-variant: #534439;
+  --color-outline: #857467;
+  --color-outline-variant: #d8c3b4;
+  --color-error: #ba1a1a;
+  --color-background: #fbf9f5;
+  --font-sans: var(--font-jakarta);
+  --radius-sm: 0.25rem;
+  --radius-DEFAULT: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-full: 9999px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #fbf9f5;
+  color: #1b1c1a;
+  font-family: var(--font-jakarta), "Plus Jakarta Sans", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.shadow-artisan {
+  box-shadow: 0 4px 24px 0 rgba(244, 164, 96, 0.10), 0 1px 4px 0 rgba(141, 79, 17, 0.06);
+}
+
+.shadow-artisan-lg {
+  box-shadow: 0 8px 40px 0 rgba(244, 164, 96, 0.14), 0 2px 8px 0 rgba(141, 79, 17, 0.08);
+}
+
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 48px 0 rgba(244, 164, 96, 0.18), 0 4px 12px 0 rgba(141, 79, 17, 0.10);
+}
+
+.btn-press:active {
+  transform: scale(0.98);
+  box-shadow: 0 1px 4px 0 rgba(141, 79, 17, 0.12);
+}
