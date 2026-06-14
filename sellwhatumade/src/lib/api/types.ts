@@ -99,8 +99,10 @@ export interface Category {
   slug: string;
   parentId?: string | null;
   image?: string;
+  imageUrl?: string;
   icon?: string;
   description?: string;
+  sortOrder?: number;
   productCount?: number;
   children?: Category[];
 }

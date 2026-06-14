@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lightbulb, CheckCircle, ChevronDown, Loader2, Plus, X } from "lucide-react";
+import { Lightbulb, CheckCircle, ChevronDown, Loader2, Plus, X, Upload } from "lucide-react";
 import SellerSidebar from "@/components/SellerSidebar";
 import { api } from "@/lib/api/client";
 import { useRequireRole } from "@/lib/auth/useRequireRole";
@@ -29,7 +29,11 @@ export default function AddProductPage() {
   const [images, setImages] = useState<string[]>([]);
   const [imageInput, setImageInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const MAX_FILE_BYTES = 3 * 1024 * 1024; // 3MB per image (stored inline as data URL)
 
   useEffect(() => {
     if (!ready) return;
@@ -43,6 +47,34 @@ export default function AddProductPage() {
     if (url) {
       setImages((prev) => [...prev, url]);
       setImageInput("");
+    }
+  };
+
+  const readAsDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
+      reader.readAsDataURL(file);
+    });
+
+  const onFilesSelected = async (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    setError(null);
+    setUploading(true);
+    try {
+      const files = Array.from(fileList);
+      for (const file of files) {
+        if (!file.type.startsWith("image/")) throw new Error(`${file.name} is not an image.`);
+        if (file.size > MAX_FILE_BYTES) throw new Error(`${file.name} is larger than 3MB.`);
+      }
+      const dataUrls = await Promise.all(files.map(readAsDataUrl));
+      setImages((prev) => [...prev, ...dataUrls]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not read image file.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -106,6 +138,33 @@ export default function AddProductPage() {
               {/* Images */}
               <div className="bg-white rounded-2xl shadow-artisan p-5">
                 <h2 className="font-semibold text-[#1b1c1a] mb-4">Product Images</h2>
+
+                {/* Upload from device */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => onFilesSelected(e.target.files)}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="w-full mb-3 px-4 py-6 bg-[#fbf9f5] border-2 border-dashed border-[#d8c3b4] rounded-xl text-sm text-[#857467] flex flex-col items-center justify-center gap-1.5 hover:border-[#f4a460] hover:text-[#8d4f11] transition-colors disabled:opacity-60"
+                >
+                  {uploading ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />}
+                  <span className="font-semibold">{uploading ? "Reading images…" : "Upload from your device"}</span>
+                  <span className="text-xs">PNG / JPG, up to 3MB each</span>
+                </button>
+
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="h-px flex-1 bg-[#ece5dd]" />
+                  <span className="text-xs text-[#857467]">or paste a URL</span>
+                  <div className="h-px flex-1 bg-[#ece5dd]" />
+                </div>
+
                 <div className="flex gap-2 mb-3">
                   <input
                     type="url"

@@ -1,13 +1,14 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Leaf, BarChart2, Shield, ShoppingBag, LogOut } from "lucide-react";
+import { Leaf, BarChart2, Shield, ShoppingBag, Tags, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/auth/AuthContext";
 
 const navItems = [
   { icon: BarChart2, label: "Dashboard", href: "/admin/dashboard" },
   { icon: Shield, label: "Sellers", href: "/admin/users" },
   { icon: ShoppingBag, label: "Orders", href: "/admin/orders" },
+  { icon: Tags, label: "Categories", href: "/admin/categories" },
 ];
 
 export default function AdminSidebar() {
