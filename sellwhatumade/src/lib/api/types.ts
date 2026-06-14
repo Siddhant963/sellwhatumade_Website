@@ -329,3 +329,31 @@ export interface CoinBalance {
   balance: number;
   valuePaise?: number;
 }
+
+// ── Account settings ───────────────────────────────────────────────────────────
+
+export interface NotificationPreferences {
+  orderUpdates: boolean;
+  dealsOffers: boolean;
+  makerStories: boolean;
+  backInStock: boolean;
+  systemAlerts: boolean;
+}
+
+/** Editable subset of notification prefs (systemAlerts is non-disableable). */
+export type EditableNotificationPrefs = Omit<NotificationPreferences, "systemAlerts">;
+
+export interface AvatarPresignResponse {
+  uploadUrl: string;
+  publicUrl: string;
+  expiresIn: number;
+}
+
+export interface UpdateMePayload {
+  fullName?: string;
+  phone?: string;
+  location?: string;
+  avatar?: string;
+  language?: string;
+  currency?: "INR";
+}
