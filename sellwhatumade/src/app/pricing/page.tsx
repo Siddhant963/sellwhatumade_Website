@@ -1,7 +1,11 @@
+"use client";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Check, X, BadgeCheck, Star, Zap } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 const plans = [
   {
@@ -65,6 +69,14 @@ const plans = [
 ];
 
 export default function PricingPage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+    if (user?.role === "user") router.replace("/home");
+  }, [user, loading, router]);
+
   return (
     <>
       <Navbar />

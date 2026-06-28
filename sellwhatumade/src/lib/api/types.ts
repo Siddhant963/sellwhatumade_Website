@@ -236,6 +236,8 @@ export interface CheckoutInitResponse {
   razorpayKeyId?: string;
   totalPaise: number;
   currency: string;
+  /** Set by the backend when DEV_BYPASS_PAYMENT=true. Skip Razorpay modal. */
+  devBypass?: boolean;
 }
 
 // ── Seller ───────────────────────────────────────────────────────────────────
@@ -358,4 +360,65 @@ export interface UpdateMePayload {
   avatar?: string;
   language?: string;
   currency?: "INR";
+}
+
+// ── Public Artisan directory ───────────────────────────────────────────────────
+
+export interface PublicArtisan {
+  userId: string;
+  profileId: string;
+  name: string;
+  avatar: string | null;
+  shopName: string;
+  specialization: string;
+  location: string;
+  city: string;
+  state: string;
+  story: string;
+  rating: number;
+  ratingCount: number;
+  totalProducts: number;
+  totalOrders: number;
+  yearsExperience: number;
+  isVerified: boolean;
+  shopLogo: string | null;
+}
+
+// ── Seller Analytics ───────────────────────────────────────────────────────────
+
+export interface AnalyticsSummary {
+  totalViews: number;
+  totalOrders: number;
+  conversionRate: number;
+  avgRating: number;
+  totalEarningsPaise: number;
+  trends: { orders: number };
+}
+
+export interface AnalyticsMonthly {
+  month: string;
+  orders: number;
+  views: number;
+}
+
+export interface AnalyticsLocation {
+  city: string;
+  count: number;
+  pct: number;
+}
+
+export interface AnalyticsProduct {
+  productId: string;
+  name: string;
+  views: number;
+  sales: number;
+  revenuePaise: number;
+  rating: number;
+}
+
+export interface SellerAnalytics {
+  summary: AnalyticsSummary;
+  monthly: AnalyticsMonthly[];
+  locations: AnalyticsLocation[];
+  topProducts: AnalyticsProduct[];
 }

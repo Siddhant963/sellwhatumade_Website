@@ -49,13 +49,25 @@ export default function CheckoutPage() {
     setError(null);
     setPlacing(true);
     try {
-      const scriptOk = await loadRazorpay();
-      if (!scriptOk) throw new Error("Could not load the payment gateway. Check your connection.");
-
       const init = await api.post<CheckoutInitResponse>("/buyer/v1/checkout", {
         shippingAddress: { ...addr, country: "India" },
         idempotencyKey: crypto.randomUUID(),
       });
+
+      // Dev bypass: skip Razorpay modal and auto-confirm with fake payment data
+      if (init.devBypass) {
+        await api.post<Order>("/buyer/v1/checkout/verify-payment", {
+          razorpayOrderId: init.razorpayOrderId,
+          razorpayPaymentId: `pay_dev_${Date.now()}`,
+          razorpaySignature: "dev_bypass_signature",
+        });
+        await refresh();
+        router.push(`/orders/${init.orderId}?placed=1`);
+        return;
+      }
+
+      const scriptOk = await loadRazorpay();
+      if (!scriptOk) throw new Error("Could not load the payment gateway. Check your connection.");
 
       const opened = openRazorpay({
         key: init.razorpayKeyId || NEXT_PUBLIC_RAZORPAY_KEY_ID || "",
@@ -232,7 +244,7 @@ export default function CheckoutPage() {
                 {[
                   { icon: ShieldCheck, text: "Secure payments via Razorpay" },
                   { icon: Truck, text: "Pan-India delivery" },
-                  { icon: RotateCcw, text: "7-day hassle-free returns" },
+                  { icon: RotateCcw, text: "3-day hassle-free returns" },
                   { icon: BadgeCheck, text: "All artisans authenticity verified" },
                 ].map(({ icon: Icon, text }) => (
                   <div key={text} className="flex items-center gap-2 text-xs text-[#534439]">

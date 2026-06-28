@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { Package, Truck, MapPin, ArrowLeft, Loader2, CheckCircle, BadgeCheck } from "lucide-react";
+import { Package, Truck, MapPin, ArrowLeft, Loader2, CheckCircle, BadgeCheck, RotateCcw } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { api } from "@/lib/api/client";
@@ -224,6 +224,16 @@ function OrderDetail() {
                   <Truck size={16} className="text-[#8d4f11]" />
                   On the way to you
                 </div>
+              )}
+
+              {order.status === "delivered" && (
+                <Link
+                  href={`/returns?orderId=${order._id}`}
+                  className="btn-press flex items-center justify-center gap-2 py-3 bg-white border border-[#d8c3b4] text-[#534439] text-sm font-semibold rounded-xl hover:border-[#f4a460] transition-colors"
+                >
+                  <RotateCcw size={15} />
+                  Request Return
+                </Link>
               )}
 
               <Link

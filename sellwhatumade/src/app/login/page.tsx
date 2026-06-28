@@ -31,10 +31,18 @@ function LoginForm() {
     try {
       const user = await login(email, password);
       const next = searchParams.get("next");
-      if (next) router.push(next);
-      else if (user.role === "admin") router.push("/admin/dashboard");
-      else if (user.role === "seller") router.push("/seller/dashboard");
-      else router.push("/");
+      if (user.role === "admin") {
+        router.push("/admin/dashboard");
+      } else if (user.role === "seller") {
+        // Only follow `next` if it's a seller-area URL, so buyers who were
+        // redirected from e.g. /seller/onboarding don't land there after login.
+        const sellerNext = next && next.startsWith("/seller") ? next : null;
+        router.push(sellerNext ?? "/seller/dashboard");
+      } else {
+        // Buyers: respect `next` only when it's not a seller/admin area.
+        const buyerNext = next && !next.startsWith("/seller") && !next.startsWith("/admin") ? next : null;
+        router.push(buyerNext ?? "/home");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not sign in. Please try again.");
     } finally {

@@ -5,17 +5,42 @@ import Footer from "@/components/Footer";
 import ProductCard from "@/components/ProductCard";
 import ArtisanCard from "@/components/ArtisanCard";
 import TestimonialCard from "@/components/TestimonialCard";
-import { categories, artisans, testimonials } from "@/lib/data";
+import { categories, testimonials } from "@/lib/data";
 import { serverFetchOrNull } from "@/lib/api/server";
 import { productToCard } from "@/lib/mappers";
-import type { PaginatedResult, Product } from "@/lib/api/types";
+import type { PaginatedResult, Product, PublicArtisan } from "@/lib/api/types";
+
+interface PlatformStats {
+  artisans: number;
+  products: number;
+  buyers: number;
+  states: number;
+}
+
+function formatStat(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M+`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K+`;
+  return n > 0 ? `${n}+` : "—";
+}
 
 export default async function HomePage() {
-  const featured = await serverFetchOrNull<PaginatedResult<Product>>(
-    "/api/v1/products?sort=popular&limit=4",
-    { cache: "no-store" },
-  );
+  const [featured, artisansRes, stats] = await Promise.all([
+    serverFetchOrNull<PaginatedResult<Product>>(
+      "/api/v1/products?sort=popular&limit=4",
+      { cache: "no-store" },
+    ),
+    serverFetchOrNull<PaginatedResult<PublicArtisan>>(
+      "/api/v1/artisans?limit=6",
+      { cache: "no-store" },
+    ),
+    serverFetchOrNull<PlatformStats>("/api/v1/stats", { cache: "no-store" }),
+  ]);
   const featuredProducts = (featured?.data ?? []).map((p) => productToCard(p));
+  // Prefer artisans with a story, fill up from the rest to get 3
+  const allArtisans = artisansRes?.data ?? [];
+  const withStory = allArtisans.filter((a) => a.story);
+  const withoutStory = allArtisans.filter((a) => !a.story);
+  const spotlightArtisans = [...withStory, ...withoutStory].slice(0, 3);
 
   return (
     <>
@@ -116,10 +141,10 @@ export default async function HomePage() {
           <div className="max-w-7xl mx-auto px-6">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
               {[
-                { value: "1,240+", label: "Verified Artisans", icon: BadgeCheck, color: "text-[#f4a460]" },
-                { value: "18,500+", label: "Unique Products", icon: TrendingUp, color: "text-[#97f3b5]" },
-                { value: "42,000+", label: "Happy Buyers", icon: Users, color: "text-[#ffb77d]" },
-                { value: "28 States", label: "Craft Regions", icon: ShieldCheck, color: "text-[#fc9f66]" },
+                { value: stats ? formatStat(stats.artisans) : "1,240+", label: "Verified Artisans", icon: BadgeCheck, color: "text-[#f4a460]" },
+                { value: stats ? formatStat(stats.products) : "18,500+", label: "Unique Products", icon: TrendingUp, color: "text-[#97f3b5]" },
+                { value: stats ? formatStat(stats.buyers) : "42,000+", label: "Happy Buyers", icon: Users, color: "text-[#ffb77d]" },
+                { value: stats ? `${stats.states} States` : "28 States", label: "Craft Regions", icon: ShieldCheck, color: "text-[#fc9f66]" },
               ].map(({ value, label, icon: Icon, color }) => (
                 <div key={label} className="flex flex-col gap-2 text-center lg:text-left">
                   <Icon size={22} className={color} />
@@ -190,23 +215,25 @@ export default async function HomePage() {
         )}
 
         {/* Artisan Spotlight */}
-        <section className="max-w-7xl mx-auto px-6 py-20">
-          <div className="flex items-end justify-between mb-10">
-            <div>
-              <p className="text-sm font-semibold text-[#8d4f11] uppercase tracking-widest mb-2">The Makers</p>
-              <h2 className="text-3xl font-bold text-[#1b1c1a]">Stories Behind the Craft</h2>
+        {spotlightArtisans.length > 0 && (
+          <section className="max-w-7xl mx-auto px-6 py-20">
+            <div className="flex items-end justify-between mb-10">
+              <div>
+                <p className="text-sm font-semibold text-[#8d4f11] uppercase tracking-widest mb-2">The Makers</p>
+                <h2 className="text-3xl font-bold text-[#1b1c1a]">Stories Behind the Craft</h2>
+              </div>
+              <Link href="/makers" className="flex items-center gap-1 text-sm font-semibold text-[#8d4f11] hover:gap-2 transition-all">
+                Meet all makers <ArrowRight size={15} />
+              </Link>
             </div>
-            <Link href="/makers" className="flex items-center gap-1 text-sm font-semibold text-[#8d4f11] hover:gap-2 transition-all">
-              Meet all makers <ArrowRight size={15} />
-            </Link>
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {artisans.map((artisan) => (
-              <ArtisanCard key={artisan.id} artisan={artisan} />
-            ))}
-          </div>
-        </section>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {spotlightArtisans.map((artisan) => (
+                <ArtisanCard key={artisan.userId} artisan={artisan} />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Seller CTA */}
         <section className="bg-[#8d4f11] py-20 relative overflow-hidden">

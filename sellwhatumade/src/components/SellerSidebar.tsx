@@ -10,7 +10,7 @@ const navItems = [
   { icon: ShoppingBag, label: "Orders", href: "/seller/orders" },
   { icon: Wallet, label: "Payouts", href: "/seller/payouts" },
   { icon: BarChart2, label: "Analytics", href: "/seller/analytics" },
-  { icon: Settings, label: "Settings", href: "/settings" },
+  { icon: Settings, label: "Settings", href: "/seller/settings" },
 ];
 
 export default function SellerSidebar() {

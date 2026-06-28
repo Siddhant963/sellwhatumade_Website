@@ -27,7 +27,7 @@ const craftCategories = [
 ];
 
 export default function SellerOnboardingPage() {
-  const { ready } = useRequireRole(["seller", "admin"]);
+  const { ready } = useRequireRole(["seller"]);
   const { refresh } = useAuth();
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
