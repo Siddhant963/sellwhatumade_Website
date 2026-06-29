@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Search, ShoppingBag, User, Menu, X, LogOut, LayoutDashboard, Package, Heart, Settings } from "lucide-react";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -15,6 +15,18 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const accountRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!accountOpen) return;
+    function handleOutsideClick(e: MouseEvent) {
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
+        setAccountOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [accountOpen]);
 
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,10 +106,9 @@ export default function Navbar() {
 
           {/* Account */}
           {isAuthenticated ? (
-            <div className="relative">
+            <div className="relative" ref={accountRef}>
               <button
                 onClick={() => setAccountOpen((v) => !v)}
-                onBlur={() => setTimeout(() => setAccountOpen(false), 150)}
                 className="flex items-center gap-2 p-1.5 pr-3 rounded-full hover:bg-[#efeeea] transition-colors text-[#534439]"
               >
                 <span className="w-8 h-8 rounded-full bg-[#8d4f11] text-white flex items-center justify-center text-sm font-bold">
@@ -114,13 +125,13 @@ export default function Navbar() {
                     <p className="text-xs text-[#857467] truncate">{user?.email}</p>
                   </div>
                   {dashboardHref && (
-                    <MenuItem href={dashboardHref} icon={LayoutDashboard} label="Dashboard" />
+                    <MenuItem href={dashboardHref} icon={LayoutDashboard} label="Dashboard" onNavigate={() => setAccountOpen(false)} />
                   )}
-                  <MenuItem href="/orders" icon={Package} label="My Orders" />
-                  <MenuItem href="/wishlist" icon={Heart} label="Wishlist" />
-                  <MenuItem href="/settings" icon={Settings} label="Settings" />
+                  <MenuItem href="/orders" icon={Package} label="My Orders" onNavigate={() => setAccountOpen(false)} />
+                  <MenuItem href="/wishlist" icon={Heart} label="Wishlist" onNavigate={() => setAccountOpen(false)} />
+                  <MenuItem href="/settings" icon={Settings} label="Settings" onNavigate={() => setAccountOpen(false)} />
                   <button
-                    onMouseDown={() => logout().then(() => router.push("/"))}
+                    onClick={() => { setAccountOpen(false); logout().then(() => router.push("/")); }}
                     className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
                   >
                     <LogOut size={16} />
@@ -187,14 +198,17 @@ function MenuItem({
   href,
   icon: Icon,
   label,
+  onNavigate,
 }: {
   href: string;
   icon: React.ComponentType<{ size?: number }>;
   label: string;
+  onNavigate?: () => void;
 }) {
   return (
     <Link
       href={href}
+      onClick={onNavigate}
       className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#534439] hover:bg-[#efeeea] transition-colors"
     >
       <Icon size={16} />

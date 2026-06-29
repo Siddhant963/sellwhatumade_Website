@@ -44,6 +44,7 @@ interface AuthContextValue {
   loading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<AuthUser>;
+  loginWithMpin: (phone: string, mpin: string) => Promise<AuthUser>;
   signup: (input: SignupInput) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refresh: () => Promise<AuthUser | null>;
@@ -92,6 +93,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [refresh],
   );
 
+  const loginWithMpin = useCallback(
+    async (phone: string, mpin: string): Promise<AuthUser> => {
+      await authAction("mpin-login", { phone, mpin });
+      const me = await refresh();
+      if (!me) throw new ApiError(401, "MPIN login succeeded but session could not be loaded.");
+      return me;
+    },
+    [refresh],
+  );
+
   const signup = useCallback(
     async (input: SignupInput): Promise<AuthUser> => {
       await authAction("signup", input);
@@ -117,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         isAuthenticated: !!user,
         login,
+        loginWithMpin,
         signup,
         logout,
         refresh,

@@ -1,8 +1,8 @@
 "use client";
-import { Suspense, useState } from "react";
+import { Suspense, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Leaf, Eye, EyeOff, Mail, Lock, ShieldCheck, BadgeCheck, Truck, Loader2 } from "lucide-react";
+import { Leaf, Eye, EyeOff, Mail, Lock, ShieldCheck, BadgeCheck, Truck, Loader2, Phone, KeyRound } from "lucide-react";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { BACKEND_URL } from "@/lib/api/config";
 
@@ -14,40 +14,114 @@ export default function LoginPage() {
   );
 }
 
+type Tab = "email" | "mpin";
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login } = useAuth();
+  const { login, loginWithMpin } = useAuth();
+  const [activeTab, setActiveTab] = useState<Tab>("email");
+
+  // Email/password state
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  // Phone/MPIN state
+  const [phone, setPhone] = useState("");
+  const [mpin, setMpin] = useState(["", "", "", ""]);
+  const mpinRef0 = useRef<HTMLInputElement>(null);
+  const mpinRef1 = useRef<HTMLInputElement>(null);
+  const mpinRef2 = useRef<HTMLInputElement>(null);
+  const mpinRef3 = useRef<HTMLInputElement>(null);
+  const mpinRefs = [mpinRef0, mpinRef1, mpinRef2, mpinRef3];
+
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const redirectAfterLogin = useCallback(
+    (role: string) => {
+      const next = searchParams.get("next");
+      if (role === "admin") {
+        router.push("/admin/dashboard");
+      } else if (role === "seller") {
+        const sellerNext = next && next.startsWith("/seller") ? next : null;
+        router.push(sellerNext ?? "/seller/dashboard");
+      } else {
+        const buyerNext =
+          next && !next.startsWith("/seller") && !next.startsWith("/admin") ? next : null;
+        router.push(buyerNext ?? "/home");
+      }
+    },
+    [router, searchParams],
+  );
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
       const user = await login(email, password);
-      const next = searchParams.get("next");
-      if (user.role === "admin") {
-        router.push("/admin/dashboard");
-      } else if (user.role === "seller") {
-        // Only follow `next` if it's a seller-area URL, so buyers who were
-        // redirected from e.g. /seller/onboarding don't land there after login.
-        const sellerNext = next && next.startsWith("/seller") ? next : null;
-        router.push(sellerNext ?? "/seller/dashboard");
-      } else {
-        // Buyers: respect `next` only when it's not a seller/admin area.
-        const buyerNext = next && !next.startsWith("/seller") && !next.startsWith("/admin") ? next : null;
-        router.push(buyerNext ?? "/home");
-      }
+      redirectAfterLogin(user.role);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not sign in. Please try again.");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleMpinSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setError(null);
+    if (phone.length !== 10) {
+      setError("Please enter a valid 10-digit phone number.");
+      return;
+    }
+    const mpinValue = mpin.join("");
+    if (mpinValue.length !== 4) {
+      setError("Please enter your 4-digit MPIN.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const user = await loginWithMpin(phone, mpinValue);
+      redirectAfterLogin(user.role);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not sign in. Please try again.");
+      setMpin(["", "", "", ""]);
+      mpinRefs[0].current?.focus();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleMpinDigit = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+    const digit = value.slice(-1);
+    const next = [...mpin];
+    next[index] = digit;
+    setMpin(next);
+    if (digit && index < 3) {
+      mpinRefs[index + 1].current?.focus();
+    }
+    if (digit && index === 3) {
+      // Auto-submit when last digit is filled
+      const full = [...next].join("");
+      if (full.length === 4 && phone.length === 10) {
+        setTimeout(() => handleMpinSubmit(), 50);
+      }
+    }
+  };
+
+  const handleMpinKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !mpin[index] && index > 0) {
+      mpinRefs[index - 1].current?.focus();
+    }
+  };
+
+  const switchTab = (tab: Tab) => {
+    setActiveTab(tab);
+    setError(null);
   };
 
   return (
@@ -132,67 +206,150 @@ function LoginForm() {
             Continue with Google
           </button>
 
-          <div className="flex items-center gap-3 mb-6">
-            <div className="flex-1 h-px bg-[#d8c3b4]" />
-            <span className="text-xs text-[#857467] font-medium">or sign in with email</span>
-            <div className="flex-1 h-px bg-[#d8c3b4]" />
+          {/* Tab switcher */}
+          <div className="flex bg-[#f0e8df] rounded-2xl p-1 mb-6">
+            <button
+              type="button"
+              onClick={() => switchTab("email")}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                activeTab === "email"
+                  ? "bg-white text-[#1b1c1a] shadow-sm"
+                  : "text-[#857467] hover:text-[#534439]"
+              }`}
+            >
+              <Mail size={14} />
+              Email & Password
+            </button>
+            <button
+              type="button"
+              onClick={() => switchTab("mpin")}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                activeTab === "mpin"
+                  ? "bg-white text-[#1b1c1a] shadow-sm"
+                  : "text-[#857467] hover:text-[#534439]"
+              }`}
+            >
+              <Phone size={14} />
+              Phone & MPIN
+            </button>
           </div>
 
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-            {error && (
-              <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-                {error}
-              </div>
-            )}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-[#534439]">Email address</label>
-              <div className="relative">
-                <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#857467]" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="w-full pl-10 pr-4 py-3 bg-white border border-[#d8c3b4] rounded-xl text-sm text-[#1b1c1a] focus:outline-none focus:border-[#f4a460] placeholder:text-[#857467]"
-                />
-              </div>
+          {/* Error */}
+          {error && (
+            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 mb-4">
+              {error}
             </div>
+          )}
 
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-[#534439]">Password</label>
-                <Link href="/forgot-password" className="text-xs text-[#8d4f11] hover:underline font-medium">
-                  Forgot password?
-                </Link>
+          {/* Email + Password form */}
+          {activeTab === "email" && (
+            <form className="flex flex-col gap-4" onSubmit={handleEmailSubmit}>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-[#534439]">Email address</label>
+                <div className="relative">
+                  <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#857467]" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-[#d8c3b4] rounded-xl text-sm text-[#1b1c1a] focus:outline-none focus:border-[#f4a460] placeholder:text-[#857467]"
+                  />
+                </div>
               </div>
-              <div className="relative">
-                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#857467]" />
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="w-full pl-10 pr-10 py-3 bg-white border border-[#d8c3b4] rounded-xl text-sm text-[#1b1c1a] focus:outline-none focus:border-[#f4a460] placeholder:text-[#857467]"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#857467] hover:text-[#534439]"
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="btn-press w-full py-3.5 bg-[#8d4f11] hover:bg-[#6e3900] text-white font-bold rounded-2xl transition-colors mt-2 flex items-center justify-center gap-2 disabled:opacity-60"
-            >
-              {submitting && <Loader2 size={18} className="animate-spin" />}
-              {submitting ? "Signing in…" : "Sign In"}
-            </button>
-          </form>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-[#534439]">Password</label>
+                  <Link href="/forgot-password" className="text-xs text-[#8d4f11] hover:underline font-medium">
+                    Forgot password?
+                  </Link>
+                </div>
+                <div className="relative">
+                  <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#857467]" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    className="w-full pl-10 pr-10 py-3 bg-white border border-[#d8c3b4] rounded-xl text-sm text-[#1b1c1a] focus:outline-none focus:border-[#f4a460] placeholder:text-[#857467]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#857467] hover:text-[#534439]"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="btn-press w-full py-3.5 bg-[#8d4f11] hover:bg-[#6e3900] text-white font-bold rounded-2xl transition-colors mt-2 flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {submitting && <Loader2 size={18} className="animate-spin" />}
+                {submitting ? "Signing in…" : "Sign In"}
+              </button>
+            </form>
+          )}
+
+          {/* Phone + MPIN form */}
+          {activeTab === "mpin" && (
+            <form className="flex flex-col gap-5" onSubmit={handleMpinSubmit}>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-[#534439]">Phone number</label>
+                <div className="relative flex">
+                  <span className="flex items-center px-3.5 bg-[#f0e8df] border border-r-0 border-[#d8c3b4] rounded-l-xl text-sm text-[#534439] font-medium select-none">
+                    +91
+                  </span>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                    placeholder="10-digit mobile number"
+                    className="flex-1 px-4 py-3 bg-white border border-[#d8c3b4] rounded-r-xl text-sm text-[#1b1c1a] focus:outline-none focus:border-[#f4a460] placeholder:text-[#857467]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-[#534439] flex items-center gap-1.5">
+                    <KeyRound size={14} className="text-[#857467]" />
+                    Enter MPIN
+                  </label>
+                  <span className="text-xs text-[#857467]">4-digit PIN from the app</span>
+                </div>
+                <div className="flex gap-3 justify-center">
+                  {mpin.map((digit, i) => (
+                    <input
+                      key={i}
+                      ref={mpinRefs[i]}
+                      type="password"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => handleMpinDigit(i, e.target.value)}
+                      onKeyDown={(e) => handleMpinKeyDown(i, e)}
+                      className="w-14 h-14 text-center text-xl font-bold bg-white border-2 border-[#d8c3b4] rounded-2xl text-[#1b1c1a] focus:outline-none focus:border-[#f4a460] caret-transparent"
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="btn-press w-full py-3.5 bg-[#8d4f11] hover:bg-[#6e3900] text-white font-bold rounded-2xl transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {submitting && <Loader2 size={18} className="animate-spin" />}
+                {submitting ? "Signing in…" : "Sign In with MPIN"}
+              </button>
+            </form>
+          )}
 
           <p className="mt-6 text-center text-sm text-[#857467]">
             Don&apos;t have an account?{" "}
