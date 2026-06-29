@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Leaf, BarChart2, Shield, ShoppingBag, Tags, LogOut } from "lucide-react";
+import { BarChart2, Shield, ShoppingBag, Tags, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/auth/AuthContext";
 
 const navItems = [
@@ -16,11 +17,15 @@ export default function AdminSidebar() {
   const { logout } = useAuth();
   return (
     <aside className="w-60 shrink-0 bg-[#1b1c1a] fixed top-0 left-0 h-full flex flex-col py-6 px-3 z-20">
-      <Link href="/" className="flex items-center gap-2 px-3 mb-5">
-        <div className="w-8 h-8 rounded-xl bg-[#f4a460] flex items-center justify-center">
-          <Leaf size={16} className="text-white" />
-        </div>
-        <span className="font-bold text-white text-sm tracking-tight">Admin Panel</span>
+      <Link href="/" className="flex items-center px-3 mb-5">
+        <Image
+          src="/website_logo.png"
+          alt="SellWhatUMade"
+          width={400}
+          height={100}
+          className="h-10 w-auto object-contain brightness-0 invert"
+          priority
+        />
       </Link>
       <nav className="flex flex-col gap-1 flex-1 mt-4">
         {navItems.map(({ icon: Icon, label, href }) => {
