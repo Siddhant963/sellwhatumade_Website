@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Leaf, Camera, MessageCircle, Share2, Play, Mail } from "lucide-react";
+import Image from "next/image";
+import { Camera, MessageCircle, Share2, Play, Mail } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -9,9 +10,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="lg:col-span-2 flex flex-col gap-5">
             <Link href="/" className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-[#f4a460] flex items-center justify-center">
-                <Leaf size={18} className="text-white" />
-              </div>
+              <Image src="/website_logo.png" alt="SellWhatUMade" width={40} height={40} className="rounded-xl object-contain" />
               <span className="font-bold text-white text-xl tracking-tight">SellWhatUMade</span>
             </Link>
             <p className="text-sm text-[#857467] leading-relaxed max-w-xs">

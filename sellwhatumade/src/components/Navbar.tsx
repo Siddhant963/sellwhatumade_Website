@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ShoppingBag, User, Menu, X, Leaf, LogOut, LayoutDashboard, Package, Heart, Settings } from "lucide-react";
+import { Search, ShoppingBag, User, Menu, X, LogOut, LayoutDashboard, Package, Heart, Settings } from "lucide-react";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCart } from "@/lib/cart/CartContext";
 
@@ -27,15 +28,10 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 bg-[#fbf9f5]/95 backdrop-blur-sm border-b border-[#d8c3b4]/40">
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-6">
+      <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between gap-6">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 shrink-0">
-          <div className="w-8 h-8 rounded-xl bg-[#8d4f11] flex items-center justify-center">
-            <Leaf size={16} className="text-white" />
-          </div>
-          <span className="font-bold text-[#1b1c1a] text-lg tracking-tight">
-            SellWhatUMade
-          </span>
+        <Link href="/" className="shrink-0">
+          <Image src="/website_logo.png" alt="SellWhatUMade" width={400} height={100} className="object-contain h-14 w-auto max-w-[280px]" />
         </Link>
 
         {/* Desktop Nav */}

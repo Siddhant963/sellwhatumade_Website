@@ -15,6 +15,11 @@ export const metadata: Metadata = {
   title: "SellWhatUMade – Artisan Marketplace",
   description:
     "Discover authentic handcrafted treasures from rural Indian artisans. Supporting makers, honoring craft.",
+  icons: {
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
+  },
 };
 
 export default function RootLayout({
