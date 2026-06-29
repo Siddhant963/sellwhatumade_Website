@@ -1,80 +1,49 @@
 /**
- * Server-side Cloudinary presign for category images.
- * Runs entirely in Next.js — no backend deployment needed.
- * Reads CLOUDINARY_* env vars from .env.local.
+ * Proxies the Cloudinary presign request to the backend.
+ * The backend holds the Cloudinary credentials (Render env vars),
+ * so signing happens there — no credentials needed in Next.js env.
  */
 import { NextResponse } from "next/server";
-import { createHash, randomUUID } from "crypto";
 import { getAccessToken } from "@/lib/api/session";
 import { BACKEND_URL } from "@/lib/api/config";
+import { messageFromBody } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-
-function cloudinarySign(params: Record<string, string | number>, secret: string): string {
-  const sorted = Object.keys(params)
-    .sort()
-    .map((k) => `${k}=${params[k]}`)
-    .join("&");
-  return createHash("sha1").update(`${sorted}${secret}`).digest("hex");
-}
-
 export async function POST(req: Request) {
-  // ── Auth: verify caller is an admin ──────────────────────────────────────
   const token = await getAccessToken();
   if (!token) {
     return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
   }
-  const meRes = await fetch(`${BACKEND_URL}/auth/me`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    cache: "no-store",
-  }).catch(() => null);
-  if (!meRes?.ok) {
-    return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
-  }
-  const me = (await meRes.json().catch(() => null)) as { role?: string } | null;
-  if (me?.role !== "admin") {
-    return NextResponse.json({ message: "Forbidden." }, { status: 403 });
-  }
 
-  // ── Cloudinary credentials ────────────────────────────────────────────────
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-  const apiKey = process.env.CLOUDINARY_API_KEY;
-  const apiSecret = process.env.CLOUDINARY_API_SECRET;
-  const baseFolder = process.env.CLOUDINARY_FOLDER ?? "swum";
-
-  if (!cloudName || !apiKey || !apiSecret) {
-    return NextResponse.json(
-      { message: "Cloudinary credentials not configured. Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET to .env.local." },
-      { status: 503 },
-    );
-  }
-
-  // ── Validate content type ─────────────────────────────────────────────────
   const body = await req.json().catch(() => ({})) as { contentType?: string };
-  if (!body.contentType || !ALLOWED_TYPES.includes(body.contentType)) {
+
+  let backendRes: Response;
+  try {
+    backendRes = await fetch(`${BACKEND_URL}/api/v1/categories/presign-image`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ contentType: body.contentType }),
+      cache: "no-store",
+    });
+  } catch {
     return NextResponse.json(
-      { message: "Only JPEG, PNG, and WebP images are allowed." },
-      { status: 400 },
+      { message: "Could not reach the server. Please try again." },
+      { status: 502 },
     );
   }
 
-  // ── Generate signed upload params ─────────────────────────────────────────
-  const folder = `${baseFolder}/categories`;
-  const publicId = randomUUID();
-  const timestamp = Math.floor(Date.now() / 1000);
+  const data = await backendRes.json().catch(() => null);
+  if (!backendRes.ok) {
+    return NextResponse.json(
+      { message: messageFromBody(data, "Could not get upload URL.") },
+      { status: backendRes.status },
+    );
+  }
 
-  const signature = cloudinarySign({ folder, public_id: publicId, timestamp }, apiSecret);
-
-  return NextResponse.json({
-    uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-    apiKey,
-    timestamp,
-    signature,
-    folder,
-    publicId,
-    publicUrl: `https://res.cloudinary.com/${cloudName}/image/upload/${folder}/${publicId}`,
-    expiresIn: 300,
-  });
+  return NextResponse.json(data);
 }
