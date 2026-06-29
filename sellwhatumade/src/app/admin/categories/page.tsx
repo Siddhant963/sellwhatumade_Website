@@ -1,11 +1,14 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { Loader2, Plus, Pencil, Trash2, X, Tags, CheckCircle } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2, Plus, Pencil, Trash2, X, Tags, CheckCircle, Upload, ImageIcon, Link2 } from "lucide-react";
 import AdminSidebar from "@/components/AdminSidebar";
 import { api } from "@/lib/api/client";
 import { useRequireRole } from "@/lib/auth/useRequireRole";
 import { ApiError } from "@/lib/api/errors";
 import type { Category } from "@/lib/api/types";
+
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 
 const emptyForm = {
   name: "",
@@ -16,6 +19,17 @@ const emptyForm = {
   sortOrder: "0",
 };
 
+interface PresignResponse {
+  uploadUrl: string;
+  apiKey: string;
+  timestamp: number;
+  signature: string;
+  folder: string;
+  publicId: string;
+  publicUrl: string;
+  expiresIn: number;
+}
+
 export default function AdminCategoriesPage() {
   const { ready } = useRequireRole(["admin"]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -25,6 +39,10 @@ export default function AdminCategoriesPage() {
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [urlMode, setUrlMode] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,11 +66,15 @@ export default function AdminCategoriesPage() {
     setForm(emptyForm);
     setEditingId(null);
     setError(null);
+    setUploadError(null);
+    setUrlMode(false);
   };
 
   const startEdit = (c: Category) => {
     setEditingId(c._id);
     setError(null);
+    setUploadError(null);
+    setUrlMode(false);
     setForm({
       name: c.name ?? "",
       slug: c.slug ?? "",
@@ -61,6 +83,61 @@ export default function AdminCategoriesPage() {
       parentId: c.parentId ?? "",
       sortOrder: String(c.sortOrder ?? 0),
     });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset input so same file can be re-selected
+    e.target.value = "";
+
+    setUploadError(null);
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setUploadError("Only JPEG, PNG, and WebP images are allowed.");
+      return;
+    }
+    if (file.size > MAX_SIZE) {
+      setUploadError("Image must be 5 MB or smaller.");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      // 1. Get presigned params from Next.js server route (no backend deploy needed)
+      const presignRes = await fetch("/api/admin/presign-category-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentType: file.type }),
+        credentials: "same-origin",
+      });
+      if (!presignRes.ok) {
+        const e = await presignRes.json().catch(() => null) as { message?: string } | null;
+        throw new Error(e?.message ?? "Could not get upload URL.");
+      }
+      const presign = (await presignRes.json()) as PresignResponse;
+
+      // 2. Upload directly to Cloudinary
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("api_key", presign.apiKey);
+      fd.append("timestamp", String(presign.timestamp));
+      fd.append("signature", presign.signature);
+      fd.append("folder", presign.folder);
+      fd.append("public_id", presign.publicId);
+
+      const res = await fetch(presign.uploadUrl, { method: "POST", body: fd });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error((body as { error?: { message?: string } })?.error?.message ?? "Upload failed.");
+      }
+      const data = (await res.json()) as { secure_url: string };
+
+      set("imageUrl", data.secure_url);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const submit = async () => {
@@ -157,7 +234,81 @@ export default function AdminCategoriesPage() {
                       className="w-full px-3.5 py-2.5 bg-[#fbf9f5] border border-[#d8c3b4] rounded-xl text-sm focus:outline-none focus:border-[#f4a460] resize-none"
                     />
                   </div>
-                  <Field label="Image URL" value={form.imageUrl} onChange={(v) => set("imageUrl", v)} placeholder="https://… (Cloudinary)" />
+
+                  {/* Image upload section */}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-[#534439]">Category Image</label>
+                      <button
+                        type="button"
+                        onClick={() => setUrlMode((v) => !v)}
+                        className="text-xs text-[#8d4f11] hover:underline flex items-center gap-1"
+                      >
+                        {urlMode ? <><Upload size={11} /> Upload</>  : <><Link2 size={11} /> Enter URL</>}
+                      </button>
+                    </div>
+
+                    {/* Image preview */}
+                    {form.imageUrl && (
+                      <div className="relative group rounded-xl overflow-hidden border border-[#d8c3b4] bg-[#fbf9f5]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={form.imageUrl}
+                          alt="Category preview"
+                          className="w-full h-32 object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => set("imageUrl", "")}
+                          className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    )}
+
+                    {urlMode ? (
+                      /* Manual URL input */
+                      <input
+                        type="url"
+                        value={form.imageUrl}
+                        onChange={(e) => set("imageUrl", e.target.value)}
+                        placeholder="https://res.cloudinary.com/…"
+                        className="w-full px-3.5 py-2.5 bg-[#fbf9f5] border border-[#d8c3b4] rounded-xl text-sm focus:outline-none focus:border-[#f4a460] placeholder:text-[#857467]"
+                      />
+                    ) : (
+                      /* Upload button */
+                      <>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          className="hidden"
+                          onChange={handleFileChange}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploading}
+                          className="w-full py-2.5 border-2 border-dashed border-[#d8c3b4] hover:border-[#f4a460] rounded-xl text-sm text-[#857467] hover:text-[#534439] transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                        >
+                          {uploading ? (
+                            <><Loader2 size={15} className="animate-spin" /> Uploading…</>
+                          ) : form.imageUrl ? (
+                            <><ImageIcon size={15} /> Replace image</>
+                          ) : (
+                            <><Upload size={15} /> Click to upload image</>
+                          )}
+                        </button>
+                        <p className="text-xs text-[#857467]">JPEG, PNG or WebP · max 5 MB</p>
+                      </>
+                    )}
+
+                    {uploadError && (
+                      <p className="text-xs text-red-600">{uploadError}</p>
+                    )}
+                  </div>
+
                   <div className="flex flex-col gap-1.5">
                     <label className="text-sm font-medium text-[#534439]">Parent category</label>
                     <select
@@ -177,7 +328,7 @@ export default function AdminCategoriesPage() {
 
                   <button
                     onClick={submit}
-                    disabled={saving}
+                    disabled={saving || uploading}
                     className="btn-press mt-1 w-full py-2.5 bg-[#8d4f11] hover:bg-[#6e3900] text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
                   >
                     {saving ? <Loader2 size={15} className="animate-spin" /> : editingId ? <CheckCircle size={15} /> : <Plus size={15} />}
