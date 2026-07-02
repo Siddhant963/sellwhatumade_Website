@@ -147,7 +147,16 @@ export default function CheckoutPage() {
     setPlacing(true);
     try {
       const shippingAddress = selectedAddress
-        ? { ...selectedAddress, country: selectedAddress.country ?? "India" }
+        ? {
+            recipientName: selectedAddress.recipientName,
+            phone: selectedAddress.phone,
+            line1: selectedAddress.line1,
+            line2: selectedAddress.line2,
+            city: selectedAddress.city,
+            state: selectedAddress.state,
+            pincode: selectedAddress.pincode,
+            country: selectedAddress.country ?? "India",
+          }
         : { ...addr, country: "India" };
 
       if (enteringNewAddress && saveNewAddress) {

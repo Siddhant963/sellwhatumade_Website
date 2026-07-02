@@ -14,6 +14,7 @@ import { api } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCart } from "@/lib/cart/CartContext";
+import { useWishlist } from "@/lib/wishlist/WishlistContext";
 import { productToCard, PLACEHOLDER_IMAGE } from "@/lib/mappers";
 import { formatPaise, discountPercent } from "@/lib/format";
 import type { PaginatedResult, Product, Review } from "@/lib/api/types";
@@ -23,6 +24,7 @@ export default function ProductDetailPage() {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
   const { addItem } = useCart();
+  const { isWishlisted, toggle } = useWishlist();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -35,6 +37,8 @@ export default function ProductDetailPage() {
   const [variantSku, setVariantSku] = useState<string | undefined>(undefined);
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
+  const [wishlistBusy, setWishlistBusy] = useState(false);
+  const [shared, setShared] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -99,6 +103,37 @@ export default function ProductDetailPage() {
   const onBuyNow = async () => {
     const ok = await handleAdd();
     if (ok) router.push("/checkout");
+  };
+
+  const onToggleWishlist = async () => {
+    if (!isAuthenticated) {
+      router.push(`/login?next=${encodeURIComponent(`/product/${id}`)}`);
+      return;
+    }
+    setWishlistBusy(true);
+    try {
+      await toggle(id);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not update wishlist.");
+    } finally {
+      setWishlistBusy(false);
+    }
+  };
+
+  const onShare = async () => {
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    const shareData = { title: product?.name ?? "SellWhatUMade", url };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setShared(true);
+      setTimeout(() => setShared(false), 1500);
+    } catch {
+      // User cancelled the native share sheet — not an error.
+    }
   };
 
   if (loading) {
@@ -300,11 +335,29 @@ export default function ProductDetailPage() {
                   {adding ? <Loader2 size={16} className="animate-spin" /> : added ? <Check size={16} /> : <ShoppingCart size={16} />}
                   {added ? "Added to Cart" : "Add to Cart"}
                 </button>
-                <button className="w-14 h-14 border border-[#d8c3b4] rounded-2xl flex items-center justify-center text-[#534439] hover:border-[#ba1a1a] hover:text-[#ba1a1a] transition-colors shrink-0">
-                  <Heart size={18} />
+                <button
+                  onClick={onToggleWishlist}
+                  disabled={wishlistBusy}
+                  title={isWishlisted(id) ? "Remove from wishlist" : "Add to wishlist"}
+                  className={`w-14 h-14 border rounded-2xl flex items-center justify-center transition-colors shrink-0 disabled:opacity-60 ${
+                    isWishlisted(id)
+                      ? "border-[#ba1a1a] text-[#ba1a1a]"
+                      : "border-[#d8c3b4] text-[#534439] hover:border-[#ba1a1a] hover:text-[#ba1a1a]"
+                  }`}
+                >
+                  <Heart size={18} className={isWishlisted(id) ? "fill-[#ba1a1a]" : ""} />
                 </button>
-                <button className="w-14 h-14 border border-[#d8c3b4] rounded-2xl flex items-center justify-center text-[#534439] hover:border-[#8d4f11] hover:text-[#8d4f11] transition-colors shrink-0">
-                  <Share2 size={18} />
+                <button
+                  onClick={onShare}
+                  title="Share this product"
+                  className="w-14 h-14 border border-[#d8c3b4] rounded-2xl flex items-center justify-center text-[#534439] hover:border-[#8d4f11] hover:text-[#8d4f11] transition-colors shrink-0 relative"
+                >
+                  {shared ? <Check size={18} className="text-[#006d3d]" /> : <Share2 size={18} />}
+                  {shared && (
+                    <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] font-semibold bg-[#1b1c1a] text-white px-2 py-1 rounded-full whitespace-nowrap">
+                      Link copied!
+                    </span>
+                  )}
                 </button>
               </div>
 

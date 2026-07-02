@@ -6,14 +6,34 @@ import { useRouter } from "next/navigation";
 import { Star, ShoppingCart, Heart, BadgeCheck, Check, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCart } from "@/lib/cart/CartContext";
+import { useWishlist } from "@/lib/wishlist/WishlistContext";
 import type { CardProduct } from "@/lib/mappers";
 
 export default function ProductCard({ product }: { product: CardProduct }) {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
   const { addItem } = useCart();
+  const { isWishlisted, toggle } = useWishlist();
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
+  const [wishlistBusy, setWishlistBusy] = useState(false);
+  const wishlisted = isWishlisted(product.id);
+
+  const handleWishlist = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!isAuthenticated) {
+      router.push(`/login?next=${encodeURIComponent(`/product/${product.id}`)}`);
+      return;
+    }
+    setWishlistBusy(true);
+    try {
+      await toggle(product.id);
+    } catch {
+      // surfaced elsewhere; keep card resilient
+    } finally {
+      setWishlistBusy(false);
+    }
+  };
 
   const discount =
     product.originalPrice > product.price
@@ -75,8 +95,14 @@ export default function ProductCard({ product }: { product: CardProduct }) {
         </div>
 
         {/* Wishlist */}
-        <button className="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-[#534439] hover:text-[#ba1a1a] opacity-0 group-hover:opacity-100 transition-all shadow-sm">
-          <Heart size={15} />
+        <button
+          onClick={handleWishlist}
+          disabled={wishlistBusy}
+          className={`absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-60 ${
+            wishlisted ? "text-[#ba1a1a] opacity-100" : "text-[#534439] hover:text-[#ba1a1a] opacity-0 group-hover:opacity-100"
+          }`}
+        >
+          <Heart size={15} className={wishlisted ? "fill-[#ba1a1a]" : ""} />
         </button>
 
         {/* Category tag */}

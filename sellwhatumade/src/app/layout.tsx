@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth/AuthContext";
 import { CartProvider } from "@/lib/cart/CartContext";
+import { WishlistProvider } from "@/lib/wishlist/WishlistContext";
 
 const jakartaSans = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
@@ -31,7 +32,9 @@ export default function RootLayout({
     <html lang="en" className={`${jakartaSans.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-[#fbf9f5] text-[#1b1c1a]">
         <AuthProvider>
-          <CartProvider>{children}</CartProvider>
+          <CartProvider>
+            <WishlistProvider>{children}</WishlistProvider>
+          </CartProvider>
         </AuthProvider>
       </body>
     </html>
