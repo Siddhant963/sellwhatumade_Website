@@ -350,6 +350,11 @@ export type EditableNotificationPrefs = Omit<NotificationPreferences, "systemAle
 export interface AvatarPresignResponse {
   uploadUrl: string;
   publicUrl: string;
+  apiKey: string;
+  timestamp: number;
+  signature: string;
+  folder: string;
+  publicId: string;
   expiresIn: number;
 }
 

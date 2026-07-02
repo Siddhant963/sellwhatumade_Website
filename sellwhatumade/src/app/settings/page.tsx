@@ -185,13 +185,20 @@ function ProfileSection({ user, refresh }: { user: AuthUser; refresh: () => Prom
         contentType: file.type,
         fileSize: file.size,
       });
-      const put = await fetch(presign.uploadUrl, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
-      });
+      // Cloudinary signed uploads require multipart/form-data POST with the
+      // signed fields below — not a raw PUT of the file bytes.
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("api_key", presign.apiKey);
+      fd.append("timestamp", String(presign.timestamp));
+      fd.append("signature", presign.signature);
+      fd.append("folder", presign.folder);
+      fd.append("public_id", presign.publicId);
+
+      const put = await fetch(presign.uploadUrl, { method: "POST", body: fd });
       if (!put.ok) throw new Error("Upload failed. Check your connection and try again.");
-      await api.patch("/auth/me", { avatar: presign.publicUrl });
+      const uploaded = (await put.json()) as { secure_url: string };
+      await api.patch("/auth/me", { avatar: uploaded.secure_url ?? presign.publicUrl });
       await refresh();
       setToast({ kind: "ok", text: "Photo updated." });
     } catch (err) {

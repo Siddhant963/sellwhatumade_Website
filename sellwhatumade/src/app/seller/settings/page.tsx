@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Store, Link2, User, Check, AlertTriangle, Loader2, Quote } from "lucide-react";
 import SellerSidebar from "@/components/SellerSidebar";
+import { PLACEHOLDER_IMAGE } from "@/lib/mappers";
 import { useRequireRole } from "@/lib/auth/useRequireRole";
 import { api } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
@@ -51,12 +52,42 @@ function ShopProfileTab({ profile }: { profile: SellerProfile | null }) {
     yearsExperience: profile?.yearsExperience ?? 0,
     story: profile?.shopDescription ?? "",
   });
+  const [logoUrl, setLogoUrl] = useState(profile?.shopLogo ?? "");
+  const [logoUploading, setLogoUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const storyRef = useRef<HTMLTextAreaElement>(null);
+  const logoFileRef = useRef<HTMLInputElement>(null);
 
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  const onPickLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setToast(null);
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setToast({ kind: "err", text: "Use a JPEG, PNG, or WebP image." });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setToast({ kind: "err", text: "Logo must be 5 MB or smaller." });
+      return;
+    }
+    setLogoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const updated = await api.post<SellerProfile>("/seller/v1/onboarding/profile/logo", fd);
+      setLogoUrl(updated.shopLogo ?? "");
+      setToast({ kind: "ok", text: "Shop logo updated." });
+    } catch (err) {
+      setToast({ kind: "err", text: err instanceof ApiError ? err.message : "Could not upload logo." });
+    } finally {
+      setLogoUploading(false);
+      if (logoFileRef.current) logoFileRef.current.value = "";
+    }
+  };
 
   const save = async () => {
     setToast(null);
@@ -92,6 +123,29 @@ function ShopProfileTab({ profile }: { profile: SellerProfile | null }) {
       </div>
 
       {toast && <Toast kind={toast.kind} text={toast.text} />}
+
+      <div className="flex items-center gap-4 pb-5 border-b border-[#f0ede9]">
+        <div className="w-16 h-16 rounded-full bg-[#f4a460]/20 flex items-center justify-center overflow-hidden shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={logoUrl || PLACEHOLDER_IMAGE} alt="Shop logo" className="w-full h-full object-cover" />
+        </div>
+        <input
+          ref={logoFileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={onPickLogo}
+          className="hidden"
+        />
+        <button
+          type="button"
+          onClick={() => logoFileRef.current?.click()}
+          disabled={logoUploading}
+          className="flex items-center gap-2 px-4 py-2 border border-[#d8c3b4] text-sm text-[#534439] font-medium rounded-xl hover:border-[#f4a460] transition-colors disabled:opacity-60"
+        >
+          {logoUploading && <Loader2 size={14} className="animate-spin" />}
+          {logoUploading ? "Uploading…" : "Change Shop Logo"}
+        </button>
+      </div>
 
       <Labeled label="Shop Name">
         <input
