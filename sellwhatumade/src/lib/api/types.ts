@@ -232,12 +232,14 @@ export interface Order {
 export interface CheckoutInitResponse {
   orderId: string;
   orderNumber?: string;
-  razorpayOrderId: string;
+  razorpayOrderId?: string;
   razorpayKeyId?: string;
   totalPaise: number;
   currency: string;
   /** Set by the backend when DEV_BYPASS_PAYMENT=true. Skip Razorpay modal. */
   devBypass?: boolean;
+  /** Set by the backend for Cash on Delivery orders — no Razorpay step needed. */
+  codConfirmed?: boolean;
 }
 
 // ── Seller ───────────────────────────────────────────────────────────────────

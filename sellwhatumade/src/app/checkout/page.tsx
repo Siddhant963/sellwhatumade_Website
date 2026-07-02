@@ -3,7 +3,18 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, BadgeCheck, Truck, RotateCcw, ShieldCheck, Loader2, ShoppingBag } from "lucide-react";
+import {
+  ChevronRight,
+  BadgeCheck,
+  Truck,
+  RotateCcw,
+  ShieldCheck,
+  Loader2,
+  ShoppingBag,
+  LocateFixed,
+  Wallet,
+  CreditCard,
+} from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -12,6 +23,7 @@ import { api } from "@/lib/api/client";
 import { formatPaise } from "@/lib/format";
 import { PLACEHOLDER_IMAGE } from "@/lib/mappers";
 import { loadRazorpay, openRazorpay } from "@/lib/razorpay";
+import { lookupPincode, reverseGeocode } from "@/lib/address-lookup";
 import type { CheckoutInitResponse, Order } from "@/lib/api/types";
 
 const NEXT_PUBLIC_RAZORPAY_KEY_ID = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
@@ -31,14 +43,75 @@ export default function CheckoutPage() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const { cart, refresh } = useCart();
   const [addr, setAddr] = useState(emptyAddress);
+  const [paymentMethod, setPaymentMethod] = useState<"razorpay" | "cod">("razorpay");
+  const [locating, setLocating] = useState(false);
+  const [pincodeLookingUp, setPincodeLookingUp] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const items = cart?.items ?? [];
   const summary = cart?.summary;
 
-  const update = (key: keyof typeof addr) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setAddr((a) => ({ ...a, [key]: e.target.value }));
+  const update = (key: keyof typeof addr) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setAddr((a) => ({ ...a, [key]: value }));
+    if (key === "pincode" && value.length === 6 && /^\d{6}$/.test(value)) {
+      void autofillFromPincode(value);
+    }
+  };
+
+  const autofillFromPincode = async (pincode: string) => {
+    setPincodeLookingUp(true);
+    setLocationError(null);
+    try {
+      const result = await lookupPincode(pincode);
+      if (result) {
+        setAddr((a) => ({ ...a, city: result.city, state: result.state }));
+      } else {
+        setLocationError("Couldn't find that PIN code. Please enter city/state manually.");
+      }
+    } catch {
+      setLocationError("Couldn't look up that PIN code right now.");
+    } finally {
+      setPincodeLookingUp(false);
+    }
+  };
+
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError("Location isn't supported by this browser.");
+      return;
+    }
+    setLocating(true);
+    setLocationError(null);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const result = await reverseGeocode(position.coords.latitude, position.coords.longitude);
+          if (result) {
+            setAddr((a) => ({
+              ...a,
+              line1: a.line1 || result.line1,
+              city: result.city || a.city,
+              state: result.state || a.state,
+              pincode: result.pincode || a.pincode,
+            }));
+          } else {
+            setLocationError("Couldn't determine your address from this location.");
+          }
+        } catch {
+          setLocationError("Couldn't determine your address from this location.");
+        } finally {
+          setLocating(false);
+        }
+      },
+      () => {
+        setLocationError("Location permission denied. Please enter your address manually.");
+        setLocating(false);
+      },
+    );
+  };
 
   const canSubmit =
     addr.recipientName && addr.phone && addr.line1 && addr.city && addr.state && addr.pincode;
@@ -51,8 +124,16 @@ export default function CheckoutPage() {
     try {
       const init = await api.post<CheckoutInitResponse>("/buyer/v1/checkout", {
         shippingAddress: { ...addr, country: "India" },
+        paymentMethod,
         idempotencyKey: crypto.randomUUID(),
       });
+
+      // Cash on Delivery: order is confirmed immediately, no payment gateway involved.
+      if (init.codConfirmed) {
+        await refresh();
+        router.push(`/orders/${init.orderId}?placed=1`);
+        return;
+      }
 
       // Dev bypass: skip Razorpay modal and auto-confirm with fake payment data
       if (init.devBypass) {
@@ -65,6 +146,8 @@ export default function CheckoutPage() {
         router.push(`/orders/${init.orderId}?placed=1`);
         return;
       }
+
+      if (!init.razorpayOrderId) throw new Error("Payment gateway did not return an order. Please try again.");
 
       const scriptOk = await loadRazorpay();
       if (!scriptOk) throw new Error("Could not load the payment gateway. Check your connection.");
@@ -160,7 +243,22 @@ export default function CheckoutPage() {
             {/* Left: Address */}
             <div className="lg:col-span-2 flex flex-col gap-6">
               <div className="bg-white rounded-2xl p-6 shadow-artisan flex flex-col gap-5">
-                <h2 className="text-lg font-bold text-[#1b1c1a]">Delivery Address</h2>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <h2 className="text-lg font-bold text-[#1b1c1a]">Delivery Address</h2>
+                  <button
+                    type="button"
+                    onClick={useCurrentLocation}
+                    disabled={locating}
+                    className="flex items-center gap-1.5 text-sm font-semibold text-[#8d4f11] hover:underline disabled:opacity-60"
+                  >
+                    {locating ? <Loader2 size={14} className="animate-spin" /> : <LocateFixed size={14} />}
+                    {locating ? "Locating…" : "Use current location"}
+                  </button>
+                </div>
+
+                {locationError && (
+                  <p className="text-xs text-red-600 -mt-2">{locationError}</p>
+                )}
 
                 <div className="grid sm:grid-cols-2 gap-4">
                   <Field label="Recipient Name" value={addr.recipientName} onChange={update("recipientName")} placeholder="Arjun Sharma" required />
@@ -171,9 +269,54 @@ export default function CheckoutPage() {
                 <Field label="Address Line 2 (optional)" value={addr.line2} onChange={update("line2")} placeholder="Landmark, area" />
 
                 <div className="grid sm:grid-cols-3 gap-4">
+                  <Field
+                    label={`PIN Code${pincodeLookingUp ? " (looking up…)" : ""}`}
+                    value={addr.pincode}
+                    onChange={update("pincode")}
+                    placeholder="400001"
+                    required
+                  />
                   <Field label="City" value={addr.city} onChange={update("city")} placeholder="Mumbai" required />
                   <Field label="State" value={addr.state} onChange={update("state")} placeholder="Maharashtra" required />
-                  <Field label="PIN Code" value={addr.pincode} onChange={update("pincode")} placeholder="400001" required />
+                </div>
+                <p className="text-xs text-[#857467] -mt-3">
+                  Enter your PIN code and city/state will fill in automatically.
+                </p>
+              </div>
+
+              <div className="bg-white rounded-2xl p-6 shadow-artisan flex flex-col gap-4">
+                <h2 className="text-lg font-bold text-[#1b1c1a]">Payment Method</h2>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("razorpay")}
+                    className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-colors ${
+                      paymentMethod === "razorpay"
+                        ? "border-[#8d4f11] bg-[#8d4f11]/5"
+                        : "border-[#e4e2de] hover:border-[#d8c3b4]"
+                    }`}
+                  >
+                    <CreditCard size={18} className="text-[#8d4f11] mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-bold text-[#1b1c1a]">Pay Online</p>
+                      <p className="text-xs text-[#857467] mt-0.5">Card, UPI, NetBanking, or EMI via Razorpay</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("cod")}
+                    className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-colors ${
+                      paymentMethod === "cod"
+                        ? "border-[#8d4f11] bg-[#8d4f11]/5"
+                        : "border-[#e4e2de] hover:border-[#d8c3b4]"
+                    }`}
+                  >
+                    <Wallet size={18} className="text-[#8d4f11] mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-bold text-[#1b1c1a]">Cash on Delivery</p>
+                      <p className="text-xs text-[#857467] mt-0.5">Pay in cash when your order arrives</p>
+                    </div>
+                  </button>
                 </div>
               </div>
 
@@ -236,13 +379,20 @@ export default function CheckoutPage() {
                   className="btn-press w-full py-4 mt-2 bg-[#8d4f11] hover:bg-[#6e3900] text-white font-bold rounded-2xl transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
                 >
                   {placing ? <Loader2 size={18} className="animate-spin" /> : null}
-                  {placing ? "Processing…" : `Pay ${formatPaise(summary?.totalPaise)}`}
+                  {placing
+                    ? "Processing…"
+                    : paymentMethod === "cod"
+                      ? `Place Order — Pay ${formatPaise(summary?.totalPaise)} on Delivery`
+                      : `Pay ${formatPaise(summary?.totalPaise)}`}
                 </button>
               </div>
 
               <div className="flex flex-col gap-3 p-4 bg-[#f5f3ef] rounded-2xl">
                 {[
-                  { icon: ShieldCheck, text: "Secure payments via Razorpay" },
+                  {
+                    icon: ShieldCheck,
+                    text: paymentMethod === "cod" ? "Pay cash when your order arrives" : "Secure payments via Razorpay",
+                  },
                   { icon: Truck, text: "Pan-India delivery" },
                   { icon: RotateCcw, text: "3-day hassle-free returns" },
                   { icon: BadgeCheck, text: "All artisans authenticity verified" },
