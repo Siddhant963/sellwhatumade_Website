@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -14,6 +14,8 @@ import {
   LocateFixed,
   Wallet,
   CreditCard,
+  MapPin,
+  Plus,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -24,7 +26,7 @@ import { formatPaise } from "@/lib/format";
 import { PLACEHOLDER_IMAGE } from "@/lib/mappers";
 import { loadRazorpay, openRazorpay } from "@/lib/razorpay";
 import { lookupPincode, reverseGeocode } from "@/lib/address-lookup";
-import type { CheckoutInitResponse, Order } from "@/lib/api/types";
+import type { CheckoutInitResponse, Order, SavedAddress } from "@/lib/api/types";
 
 const NEXT_PUBLIC_RAZORPAY_KEY_ID = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
 
@@ -50,8 +52,29 @@ export default function CheckoutPage() {
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [addressesLoaded, setAddressesLoaded] = useState(false);
+  // null = entering a new address; otherwise the id of a saved address in use.
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [saveNewAddress, setSaveNewAddress] = useState(true);
+
   const items = cart?.items ?? [];
   const summary = cart?.summary;
+
+  useEffect(() => {
+    api
+      .get<SavedAddress[]>("/buyer/v1/addresses")
+      .then((list) => {
+        setSavedAddresses(list);
+        const preferred = list.find((a) => a.isDefault) ?? list[0];
+        if (preferred) setSelectedAddressId(preferred._id);
+      })
+      .catch(() => setSavedAddresses([]))
+      .finally(() => setAddressesLoaded(true));
+  }, []);
+
+  const selectedAddress = savedAddresses.find((a) => a._id === selectedAddressId) ?? null;
+  const enteringNewAddress = selectedAddressId === null;
 
   const update = (key: keyof typeof addr) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -113,8 +136,9 @@ export default function CheckoutPage() {
     );
   };
 
-  const canSubmit =
-    addr.recipientName && addr.phone && addr.line1 && addr.city && addr.state && addr.pincode;
+  const canSubmit = selectedAddress
+    ? true
+    : Boolean(addr.recipientName && addr.phone && addr.line1 && addr.city && addr.state && addr.pincode);
 
   const placeOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,8 +146,21 @@ export default function CheckoutPage() {
     setError(null);
     setPlacing(true);
     try {
+      const shippingAddress = selectedAddress
+        ? { ...selectedAddress, country: selectedAddress.country ?? "India" }
+        : { ...addr, country: "India" };
+
+      if (enteringNewAddress && saveNewAddress) {
+        try {
+          const saved = await api.post<SavedAddress>("/buyer/v1/addresses", shippingAddress);
+          setSavedAddresses((prev) => [saved, ...prev]);
+        } catch {
+          // Non-fatal — proceed with checkout even if saving the address failed.
+        }
+      }
+
       const init = await api.post<CheckoutInitResponse>("/buyer/v1/checkout", {
-        shippingAddress: { ...addr, country: "India" },
+        shippingAddress,
         paymentMethod,
         idempotencyKey: crypto.randomUUID(),
       });
@@ -162,7 +199,7 @@ export default function CheckoutPage() {
         prefill: {
           name: user?.fullName,
           email: user?.email,
-          contact: addr.phone,
+          contact: shippingAddress.phone,
         },
         theme: { color: "#8d4f11" },
         handler: async (resp) => {
@@ -245,43 +282,105 @@ export default function CheckoutPage() {
               <div className="bg-white rounded-2xl p-6 shadow-artisan flex flex-col gap-5">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <h2 className="text-lg font-bold text-[#1b1c1a]">Delivery Address</h2>
-                  <button
-                    type="button"
-                    onClick={useCurrentLocation}
-                    disabled={locating}
-                    className="flex items-center gap-1.5 text-sm font-semibold text-[#8d4f11] hover:underline disabled:opacity-60"
-                  >
-                    {locating ? <Loader2 size={14} className="animate-spin" /> : <LocateFixed size={14} />}
-                    {locating ? "Locating…" : "Use current location"}
-                  </button>
+                  {enteringNewAddress && (
+                    <button
+                      type="button"
+                      onClick={useCurrentLocation}
+                      disabled={locating}
+                      className="flex items-center gap-1.5 text-sm font-semibold text-[#8d4f11] hover:underline disabled:opacity-60"
+                    >
+                      {locating ? <Loader2 size={14} className="animate-spin" /> : <LocateFixed size={14} />}
+                      {locating ? "Locating…" : "Use current location"}
+                    </button>
+                  )}
                 </div>
 
                 {locationError && (
                   <p className="text-xs text-red-600 -mt-2">{locationError}</p>
                 )}
 
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <Field label="Recipient Name" value={addr.recipientName} onChange={update("recipientName")} placeholder="Arjun Sharma" required />
-                  <Field label="Phone" value={addr.phone} onChange={update("phone")} placeholder="+91 98765 43210" required type="tel" />
-                </div>
+                {!addressesLoaded && (
+                  <div className="flex items-center gap-2 text-sm text-[#857467] py-2">
+                    <Loader2 size={14} className="animate-spin" />
+                    Loading saved addresses…
+                  </div>
+                )}
 
-                <Field label="Address Line 1" value={addr.line1} onChange={update("line1")} placeholder="Flat 4B, Serenity Apartments, MG Road" required />
-                <Field label="Address Line 2 (optional)" value={addr.line2} onChange={update("line2")} placeholder="Landmark, area" />
+                {addressesLoaded && savedAddresses.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    {savedAddresses.map((a) => (
+                      <button
+                        key={a._id}
+                        type="button"
+                        onClick={() => setSelectedAddressId(a._id)}
+                        className={`flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-colors ${
+                          selectedAddressId === a._id
+                            ? "border-[#8d4f11] bg-[#8d4f11]/5"
+                            : "border-[#e4e2de] hover:border-[#d8c3b4]"
+                        }`}
+                      >
+                        <MapPin size={16} className="text-[#8d4f11] mt-0.5 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-[#1b1c1a]">
+                            {a.recipientName}
+                            {a.isDefault && <span className="ml-2 text-[10px] font-semibold text-[#006d3d] bg-[#97f3b5]/30 px-1.5 py-0.5 rounded-full">DEFAULT</span>}
+                          </p>
+                          <p className="text-xs text-[#857467] mt-0.5">
+                            {a.line1}{a.line2 ? `, ${a.line2}` : ""}, {a.city}, {a.state} {a.pincode}
+                          </p>
+                          <p className="text-xs text-[#857467]">{a.phone}</p>
+                        </div>
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAddressId(null)}
+                      className={`flex items-center gap-2 p-3.5 rounded-xl border-2 border-dashed text-left transition-colors ${
+                        enteringNewAddress ? "border-[#8d4f11] bg-[#8d4f11]/5" : "border-[#d8c3b4] hover:border-[#8d4f11]"
+                      }`}
+                    >
+                      <Plus size={16} className="text-[#8d4f11]" />
+                      <span className="text-sm font-semibold text-[#8d4f11]">Add a new address</span>
+                    </button>
+                  </div>
+                )}
 
-                <div className="grid sm:grid-cols-3 gap-4">
-                  <Field
-                    label={`PIN Code${pincodeLookingUp ? " (looking up…)" : ""}`}
-                    value={addr.pincode}
-                    onChange={update("pincode")}
-                    placeholder="400001"
-                    required
-                  />
-                  <Field label="City" value={addr.city} onChange={update("city")} placeholder="Mumbai" required />
-                  <Field label="State" value={addr.state} onChange={update("state")} placeholder="Maharashtra" required />
-                </div>
-                <p className="text-xs text-[#857467] -mt-3">
-                  Enter your PIN code and city/state will fill in automatically.
-                </p>
+                {addressesLoaded && enteringNewAddress && (
+                  <>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <Field label="Recipient Name" value={addr.recipientName} onChange={update("recipientName")} placeholder="Arjun Sharma" required />
+                      <Field label="Phone" value={addr.phone} onChange={update("phone")} placeholder="+91 98765 43210" required type="tel" />
+                    </div>
+
+                    <Field label="Address Line 1" value={addr.line1} onChange={update("line1")} placeholder="Flat 4B, Serenity Apartments, MG Road" required />
+                    <Field label="Address Line 2 (optional)" value={addr.line2} onChange={update("line2")} placeholder="Landmark, area" />
+
+                    <div className="grid sm:grid-cols-3 gap-4">
+                      <Field
+                        label={`PIN Code${pincodeLookingUp ? " (looking up…)" : ""}`}
+                        value={addr.pincode}
+                        onChange={update("pincode")}
+                        placeholder="400001"
+                        required
+                      />
+                      <Field label="City" value={addr.city} onChange={update("city")} placeholder="Mumbai" required />
+                      <Field label="State" value={addr.state} onChange={update("state")} placeholder="Maharashtra" required />
+                    </div>
+                    <p className="text-xs text-[#857467] -mt-3">
+                      Enter your PIN code and city/state will fill in automatically.
+                    </p>
+
+                    <label className="flex items-center gap-2 text-sm text-[#534439]">
+                      <input
+                        type="checkbox"
+                        checked={saveNewAddress}
+                        onChange={(e) => setSaveNewAddress(e.target.checked)}
+                        className="rounded border-[#d8c3b4]"
+                      />
+                      Save this address for next time
+                    </label>
+                  </>
+                )}
               </div>
 
               <div className="bg-white rounded-2xl p-6 shadow-artisan flex flex-col gap-4">

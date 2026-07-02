@@ -228,6 +228,20 @@ export interface Order {
   updatedAt?: string;
 }
 
+/** A buyer's saved delivery address (/buyer/v1/addresses). */
+export interface SavedAddress {
+  _id: string;
+  recipientName: string;
+  phone: string;
+  line1: string;
+  line2?: string;
+  city: string;
+  state: string;
+  pincode: string;
+  country?: string;
+  isDefault: boolean;
+}
+
 /** Response from POST /buyer/v1/checkout (Razorpay order init). */
 export interface CheckoutInitResponse {
   orderId: string;
