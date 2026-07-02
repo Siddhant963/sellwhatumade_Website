@@ -246,7 +246,7 @@ export const testimonials = [
     name: "Ananya P.",
     location: "Mumbai",
     rating: 5,
-    text: "The Banarasi silk sari I ordered arrived beautifully packed. The quality is beyond anything I could find locally. Knowing I'm supporting a real artisan family makes it even more special.",
+    text: "The Banarasi silk stole I ordered arrived beautifully packed. The quality is beyond anything I could find locally. Knowing I'm supporting a real artisan family makes it even more special.",
     product: "Banarasi Silk Stole",
     verified: true,
   },

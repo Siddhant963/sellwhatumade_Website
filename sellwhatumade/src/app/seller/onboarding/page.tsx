@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Leaf, Check, ChevronRight, ChevronLeft, User, Palette, BookOpen, CreditCard, Eye, Loader2 } from "lucide-react";
+import { Check, ChevronRight, ChevronLeft, User, Palette, BookOpen, CreditCard, Eye, Loader2 } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useRequireRole } from "@/lib/auth/useRequireRole";
@@ -106,10 +107,7 @@ export default function SellerOnboardingPage() {
     <div className="min-h-screen bg-[#fbf9f5]">
       <div className="bg-white border-b border-[#e4e2de] px-6 py-4 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-[#f4a460] flex items-center justify-center">
-            <Leaf size={16} className="text-white" />
-          </div>
-          <span className="font-bold text-[#1b1c1a] tracking-tight">SellWhatUMade</span>
+          <Image src="/website_logo.png" alt="SellWhatUMade" width={140} height={36} className="object-contain h-9 w-auto" />
         </Link>
         <span className="text-sm text-[#857467]">Seller Onboarding</span>
       </div>

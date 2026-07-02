@@ -299,7 +299,7 @@ export default function SellerSettingsPage() {
   return (
     <div className="flex min-h-screen bg-[#fbf9f5]">
       <SellerSidebar />
-      <main className="flex-1 pl-56">
+      <main className="flex-1 pt-14 lg:pt-0 lg:pl-56">
         <div className="max-w-3xl mx-auto px-8 py-10">
           <h1 className="text-2xl font-bold text-[#1b1c1a] mb-1">Settings</h1>
           <p className="text-sm text-[#857467] mb-8">Manage your shop and account preferences.</p>

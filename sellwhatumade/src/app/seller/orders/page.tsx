@@ -105,7 +105,7 @@ export default function SellerOrdersPage() {
   return (
     <div className="min-h-screen bg-[#fbf9f5] flex">
       <SellerSidebar />
-      <div className="flex-1 ml-56 px-6 py-8">
+      <div className="flex-1 pt-14 lg:pt-0 lg:ml-56 px-4 sm:px-6 py-6 lg:py-8">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-[#1b1c1a]">Manage Orders</h1>
           <p className="text-sm text-[#857467] mt-1">

@@ -81,7 +81,7 @@ export default function PayoutsPage() {
   return (
     <div className="min-h-screen flex bg-[#fbf9f5]">
       <SellerSidebar />
-      <main className="ml-56 flex-1 p-8">
+      <main className="pt-14 lg:pt-0 lg:ml-56 flex-1 p-4 sm:p-6 lg:p-8">
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center justify-between mb-7">
             <div>

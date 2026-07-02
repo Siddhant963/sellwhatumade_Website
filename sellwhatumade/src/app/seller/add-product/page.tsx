@@ -33,7 +33,7 @@ export default function AddProductPage() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const MAX_FILE_BYTES = 3 * 1024 * 1024; // 3MB per image (stored inline as data URL)
+  const MAX_FILE_BYTES = 3 * 1024 * 1024; // 3MB per image
 
   useEffect(() => {
     if (!ready) return;
@@ -50,13 +50,12 @@ export default function AddProductPage() {
     }
   };
 
-  const readAsDataUrl = (file: File) =>
-    new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
-      reader.readAsDataURL(file);
-    });
+  const uploadFile = async (file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    const { url } = await api.post<{ url: string }>("/seller/v1/products/upload-image", body);
+    return url;
+  };
 
   const onFilesSelected = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
@@ -68,10 +67,15 @@ export default function AddProductPage() {
         if (!file.type.startsWith("image/")) throw new Error(`${file.name} is not an image.`);
         if (file.size > MAX_FILE_BYTES) throw new Error(`${file.name} is larger than 3MB.`);
       }
-      const dataUrls = await Promise.all(files.map(readAsDataUrl));
-      setImages((prev) => [...prev, ...dataUrls]);
+      // Upload each file to the CDN and store the returned URL — never embed
+      // raw image bytes in the product payload, it blows past the API's JSON body limit.
+      const urls: string[] = [];
+      for (const file of files) {
+        urls.push(await uploadFile(file));
+      }
+      setImages((prev) => [...prev, ...urls]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not read image file.");
+      setError(err instanceof Error ? err.message : "Could not upload image file.");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -126,7 +130,7 @@ export default function AddProductPage() {
   return (
     <div className="min-h-screen flex bg-[#fbf9f5]">
       <SellerSidebar />
-      <main className="ml-56 flex-1 p-8">
+      <main className="pt-14 lg:pt-0 lg:ml-56 flex-1 p-4 sm:p-6 lg:p-8">
         <div className="max-w-5xl mx-auto">
           <div className="mb-7">
             <h1 className="text-2xl font-bold text-[#1b1c1a]">Add New Product</h1>
@@ -178,7 +182,7 @@ export default function AddProductPage() {
                     <Plus size={15} /> Add
                   </button>
                 </div>
-                <div className="grid grid-cols-5 gap-3">
+                <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3">
                   {images.map((img, i) => (
                     <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-[#efeeea] group">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -210,7 +214,7 @@ export default function AddProductPage() {
                       className="w-full px-4 py-3 bg-[#fbf9f5] border border-[#d8c3b4] rounded-xl text-sm focus:outline-none focus:border-[#f4a460] placeholder:text-[#857467]"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-sm font-medium text-[#534439]">Category</label>
                       <div className="relative">
@@ -254,7 +258,7 @@ export default function AddProductPage() {
               {/* Craft details */}
               <div className="bg-white rounded-2xl shadow-artisan p-5">
                 <h2 className="font-semibold text-[#1b1c1a] mb-4">Craft Details</h2>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input label="Primary Material" value={form.material} onChange={(v) => set("material", v)} placeholder="e.g. Quartz & Glass" />
                   <Input label="Origin Region" value={form.region} onChange={(v) => set("region", v)} placeholder="e.g. Jaipur, Rajasthan" />
                   <Input label="Delivery Time (days)" value={form.deliveryDays} onChange={(v) => set("deliveryDays", v)} placeholder="5" type="number" />
@@ -264,7 +268,7 @@ export default function AddProductPage() {
               {/* Pricing */}
               <div className="bg-white rounded-2xl shadow-artisan p-5">
                 <h2 className="font-semibold text-[#1b1c1a] mb-4">Pricing &amp; Inventory</h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                   <Input label="Price (₹)" value={form.price} onChange={(v) => set("price", v)} placeholder="2499" type="number" />
                   <Input label="MRP (₹)" value={form.mrp} onChange={(v) => set("mrp", v)} placeholder="2999" type="number" />
                   <Input label="Stock" value={form.stock} onChange={(v) => set("stock", v)} placeholder="10" type="number" />

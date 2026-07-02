@@ -62,7 +62,7 @@ export default function SellerDashboardPage() {
   return (
     <div className="min-h-screen bg-[#fbf9f5] flex">
       <SellerSidebar />
-      <div className="flex-1 ml-56">
+      <div className="flex-1 pt-14 lg:pt-0 lg:ml-56">
         <header className="sticky top-0 z-20 bg-[#fbf9f5]/95 backdrop-blur border-b border-[#e4e2de] px-6 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-lg font-bold text-[#1b1c1a]">Seller Dashboard</h1>

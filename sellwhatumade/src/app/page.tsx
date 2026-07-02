@@ -20,7 +20,7 @@ interface PlatformStats {
 function formatStat(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M+`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K+`;
-  return n > 0 ? `${n}+` : "—";
+  return `${n}+`;
 }
 
 export const metadata = {
@@ -58,7 +58,9 @@ export default async function HomePage() {
             <div className="flex flex-col gap-8">
               <div className="flex items-center gap-2 w-fit px-4 py-2 bg-[#97f3b5]/20 border border-[#97f3b5]/50 rounded-full">
                 <BadgeCheck size={15} className="text-[#006d3d]" />
-                <span className="text-sm font-semibold text-[#006d3d]">1,240+ Authentic Artisans</span>
+                <span className="text-sm font-semibold text-[#006d3d]">
+                  {stats ? formatStat(stats.artisans) : "1,240+"} Authentic Artisans
+                </span>
               </div>
 
               <div className="flex flex-col gap-4">
@@ -252,7 +254,7 @@ export default async function HomePage() {
               Sell What You Made to the World
             </h2>
             <p className="text-[#ffdcc3] text-lg mb-8 leading-relaxed">
-              Join 1,240+ artisans who earn directly from their craft. No middlemen. Zero upfront cost. Your story, your price.
+              Join {stats ? formatStat(stats.artisans) : "1,240+"} artisans who earn directly from their craft. No middlemen. Zero upfront cost. Your story, your price.
             </p>
             <div className="flex flex-wrap gap-4 justify-center">
               <Link
