@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { Leaf, Mail, ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
+import Image from "next/image";
+import { Mail, ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
 import { api } from "@/lib/api/client";
 
 export default function ForgotPasswordPage() {
@@ -27,10 +28,7 @@ export default function ForgotPasswordPage() {
     <div className="min-h-screen bg-[#fbf9f5] flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-md">
         <Link href="/" className="flex items-center gap-2 mb-10">
-          <div className="w-9 h-9 rounded-xl bg-[#f4a460] flex items-center justify-center">
-            <Leaf size={18} className="text-white" />
-          </div>
-          <span className="font-bold text-[#1b1c1a] text-lg tracking-tight">SellWhatUMade</span>
+          <Image src="/website_logo.png" alt="SellWhatUMade" width={160} height={40} className="object-contain h-10 w-auto" />
         </Link>
 
         {sent ? (
