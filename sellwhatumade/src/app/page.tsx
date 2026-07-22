@@ -8,6 +8,7 @@ import TestimonialCard from "@/components/TestimonialCard";
 import { categories, testimonials } from "@/lib/data";
 import { serverFetchOrNull } from "@/lib/api/server";
 import { productToCard } from "@/lib/mappers";
+import { SITE_URL, DEFAULT_KEYWORDS } from "@/lib/seo";
 import type { PaginatedResult, Product, PublicArtisan } from "@/lib/api/types";
 
 interface PlatformStats {
@@ -23,10 +24,17 @@ function formatStat(n: number): string {
   return `${n}+`;
 }
 
+const title = "SellWhatUMade — Authentic Handcrafted Treasures from India";
+const description =
+  "Discover authentic handcrafted treasures from rural Indian artisans. Every purchase directly supports a maker and preserves a centuries-old craft. Vocal for Local, made in India.";
+
 export const metadata = {
-  title: "SellWhatUMade — Authentic Handcrafted Treasures from India",
-  description:
-    "Discover authentic handcrafted treasures from rural Indian artisans. Every purchase directly supports a maker and preserves a centuries-old craft.",
+  title,
+  description,
+  keywords: DEFAULT_KEYWORDS,
+  alternates: { canonical: SITE_URL },
+  openGraph: { title, description, url: SITE_URL },
+  twitter: { title, description },
 };
 
 export default async function HomePage() {
@@ -47,8 +55,25 @@ export default async function HomePage() {
   const withoutStory = allArtisans.filter((a) => !a.story);
   const spotlightArtisans = [...withStory, ...withoutStory].slice(0, 3);
 
+  const itemListJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    itemListElement: featuredProducts.map((p, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: `${SITE_URL}/product/${p.id}`,
+      name: p.name,
+    })),
+  };
+
   return (
     <>
+      {featuredProducts.length > 0 && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
+        />
+      )}
       <Navbar />
       <main className="flex-1">
         {/* Hero */}
@@ -111,14 +136,14 @@ export default async function HomePage() {
                 <div className="rounded-2xl overflow-hidden flex-1 shadow-artisan">
                   <img
                     src="https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&q=80"
-                    alt="Blue pottery"
+                    alt="Hand-painted blue pottery from Jaipur, Rajasthan"
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <div className="rounded-2xl overflow-hidden h-36 shadow-artisan">
                   <img
                     src="https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&q=80"
-                    alt="Brass craft"
+                    alt="Hand-cast Dhokra brass craft from tribal Chhattisgarh artisans"
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -127,14 +152,14 @@ export default async function HomePage() {
                 <div className="rounded-2xl overflow-hidden h-36 shadow-artisan">
                   <img
                     src="https://images.unsplash.com/photo-1558769132-cb1aea458c5e?w=400&q=80"
-                    alt="Silk weaving"
+                    alt="Hand-woven Banarasi silk textile from Varanasi weavers"
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <div className="rounded-2xl overflow-hidden flex-1 shadow-artisan">
                   <img
                     src="https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=400&q=80"
-                    alt="Madhubani art"
+                    alt="Hand-painted Madhubani folk art from Bihar"
                     className="w-full h-full object-cover"
                   />
                 </div>

@@ -1,7 +1,21 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Users, Globe, TrendingUp, Heart, ShieldCheck, Leaf } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { SITE_URL } from "@/lib/seo";
+
+const title = "About Us — Empowering Rural Indian Artisans";
+const description =
+  "SellWhatUMade is a Vocal for Local marketplace connecting rural Indian artisans directly with buyers, cutting out middlemen and preserving centuries-old handicraft traditions.";
+
+export const metadata: Metadata = {
+  title,
+  description,
+  alternates: { canonical: `${SITE_URL}/about` },
+  openGraph: { title, description, url: `${SITE_URL}/about` },
+  twitter: { title, description },
+};
 
 const team = [
   {

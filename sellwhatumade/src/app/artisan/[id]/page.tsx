@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BadgeCheck, MapPin, Star, Package, ArrowLeft } from "lucide-react";
@@ -6,15 +7,37 @@ import Footer from "@/components/Footer";
 import { serverFetchOrNull } from "@/lib/api/server";
 import { formatPaise } from "@/lib/format";
 import { PLACEHOLDER_IMAGE } from "@/lib/mappers";
+import { SITE_URL, DEFAULT_OG_IMAGE } from "@/lib/seo";
 import type { PublicArtisan, PaginatedResult, Product } from "@/lib/api/types";
 
 const AVATAR_PLACEHOLDER = "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=200&q=80";
 
-export default async function ArtisanStorefrontPage({
-  params,
-}: {
+interface Props {
   params: Promise<{ id: string }>;
-}) {
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
+  const artisan = await serverFetchOrNull<PublicArtisan>(`/api/v1/artisans/${id}`);
+  if (!artisan) return { title: "Artisan not found" };
+
+  const title = `${artisan.name} — ${artisan.specialization || "Artisan"} from ${artisan.location || "India"}`;
+  const description =
+    artisan.story?.slice(0, 155) ||
+    `Shop handmade ${artisan.specialization || "crafts"} directly from ${artisan.name}, a rural Indian artisan from ${artisan.location || "India"}.`;
+  const url = `${SITE_URL}/artisan/${id}`;
+  const image = artisan.avatar || artisan.shopLogo || DEFAULT_OG_IMAGE;
+
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: { type: "profile", url, title, description, images: [image] },
+    twitter: { card: "summary_large_image", title, description, images: [image] },
+  };
+}
+
+export default async function ArtisanStorefrontPage({ params }: Props) {
   const { id } = await params;
 
   const [artisan, productsRes] = await Promise.all([
@@ -28,8 +51,32 @@ export default async function ArtisanStorefrontPage({
 
   const artisanProducts = productsRes?.data ?? [];
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: artisan.name,
+    image: artisan.avatar || DEFAULT_OG_IMAGE,
+    jobTitle: artisan.specialization || "Artisan",
+    address: artisan.location ? { "@type": "PostalAddress", addressLocality: artisan.location } : undefined,
+    description: artisan.story,
+    url: `${SITE_URL}/artisan/${id}`,
+    ...(artisan.rating > 0
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: artisan.rating,
+            ratingCount: artisan.ratingCount || 1,
+          },
+        }
+      : {}),
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Navbar />
       <main className="flex-1 bg-[#fbf9f5]">
         {/* Hero banner */}
@@ -64,7 +111,7 @@ export default async function ArtisanStorefrontPage({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={artisan.avatar ?? AVATAR_PLACEHOLDER}
-                alt={artisan.name}
+                alt={`${artisan.name}, ${artisan.specialization || "artisan"} from ${artisan.location || "India"}`}
                 className="w-24 h-24 rounded-2xl object-cover border-4 border-white shadow-artisan"
               />
               {artisan.isVerified && (

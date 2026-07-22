@@ -1,9 +1,10 @@
-"use client";
-import { useState } from "react";
-import Link from "next/link";
-import { Search, Package, CreditCard, ShieldCheck, Truck, User, MessageCircle, ChevronDown, ChevronUp, MessageSquare, Mail } from "lucide-react";
+import type { Metadata } from "next";
+import { Package, CreditCard, ShieldCheck, Truck, User, MessageCircle, MessageSquare, Mail } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import HelpSearchBox from "@/components/HelpSearchBox";
+import FaqAccordion from "@/components/FaqAccordion";
+import { SITE_URL } from "@/lib/seo";
 
 const topics = [
   { icon: Package, label: "Orders", desc: "Tracking, cancellations, and order history" },
@@ -37,35 +38,41 @@ const faqs = [
   },
 ];
 
-export default function HelpPage() {
-  const [search, setSearch] = useState("");
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
+const title = "Help Center — Orders, Shipping, Returns & Artisan Authenticity";
+const description =
+  "Answers to common questions about ordering handmade crafts, delivery to rural and urban India, returns, and how we verify artisan authenticity on SellWhatUMade.";
 
+export const metadata: Metadata = {
+  title,
+  description,
+  alternates: { canonical: `${SITE_URL}/help` },
+  openGraph: { title, description, url: `${SITE_URL}/help` },
+  twitter: { title, description },
+};
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map((faq) => ({
+    "@type": "Question",
+    name: faq.q,
+    acceptedAnswer: { "@type": "Answer", text: faq.a },
+  })),
+};
+
+export default function HelpPage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <Navbar />
       <main className="flex-1 bg-[#fbf9f5]">
         {/* Hero */}
         <section className="bg-[#1b1c1a] py-16 px-6 text-center">
           <h1 className="text-3xl font-bold text-white mb-4">How can we help you?</h1>
-          <div className="max-w-lg mx-auto relative">
-            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#857467]" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search help articles..."
-              className="w-full pl-11 pr-4 py-3.5 bg-white border border-transparent rounded-2xl text-sm focus:outline-none focus:border-[#f4a460] shadow-artisan"
-            />
-          </div>
-          <div className="flex items-center justify-center gap-4 mt-4 text-xs text-[#857467]">
-            Popular:
-            {["Track my order", "Return policy", "Artisan certification"].map((tag) => (
-              <button key={tag} className="text-[#f4a460] hover:underline">
-                {tag}
-              </button>
-            ))}
-          </div>
+          <HelpSearchBox />
         </section>
 
         <div className="max-w-5xl mx-auto px-6 py-12">
@@ -88,28 +95,7 @@ export default function HelpPage() {
 
           {/* FAQ */}
           <h2 className="text-xl font-bold text-[#1b1c1a] mb-5">Frequently Asked Questions</h2>
-          <div className="flex flex-col gap-3 mb-12">
-            {faqs.map((faq, i) => (
-              <div key={i} className="bg-white rounded-2xl shadow-artisan overflow-hidden">
-                <button
-                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left"
-                >
-                  <span className="text-sm font-semibold text-[#1b1c1a]">{faq.q}</span>
-                  {openFaq === i ? (
-                    <ChevronUp size={16} className="text-[#8d4f11] shrink-0" />
-                  ) : (
-                    <ChevronDown size={16} className="text-[#857467] shrink-0" />
-                  )}
-                </button>
-                {openFaq === i && (
-                  <div className="px-5 pb-4">
-                    <p className="text-sm text-[#534439] leading-relaxed">{faq.a}</p>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+          <FaqAccordion faqs={faqs} />
 
           {/* Contact options */}
           <div className="grid md:grid-cols-2 gap-4">

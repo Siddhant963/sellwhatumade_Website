@@ -121,6 +121,15 @@ function OrderDetail() {
             </span>
           </div>
 
+          {order.orderGroupId && (
+            <Link
+              href={`/orders?group=${order.orderGroupId}`}
+              className="inline-block mb-6 text-xs font-semibold text-[#8d4f11] hover:underline"
+            >
+              Part of a multi-vendor order — view all
+            </Link>
+          )}
+
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Timeline + items */}
             <div className="flex-1 flex flex-col gap-6">

@@ -207,6 +207,10 @@ export interface Order {
   _id: string;
   orderNumber: string;
   userId?: string;
+  /** The single vendor this order belongs to. */
+  sellerId?: string;
+  /** Ties together every per-vendor order created from one cart checkout. */
+  orderGroupId?: string;
   items: OrderItem[];
   shippingAddress: Address;
   status: OrderStatus;
@@ -242,10 +246,19 @@ export interface SavedAddress {
   isDefault: boolean;
 }
 
-/** Response from POST /buyer/v1/checkout (Razorpay order init). */
-export interface CheckoutInitResponse {
+/** One per-vendor order created from a single cart checkout. */
+export interface CheckoutInitOrderSummary {
   orderId: string;
-  orderNumber?: string;
+  orderNumber: string;
+  sellerId: string;
+  totalPaise: number;
+}
+
+/** Response from POST /buyer/v1/checkout (Razorpay order init). A cart spanning
+ *  several vendors is split into one order per vendor, all sharing one payment. */
+export interface CheckoutInitResponse {
+  orderGroupId: string;
+  orders: CheckoutInitOrderSummary[];
   razorpayOrderId?: string;
   razorpayKeyId?: string;
   totalPaise: number;

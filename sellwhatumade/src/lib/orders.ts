@@ -31,3 +31,27 @@ export function statusMeta(status: OrderStatus): StatusMeta {
 export function orderTotalPaise(order: { totalPaise?: number }): number {
   return order.totalPaise ?? 0;
 }
+
+/**
+ * Groups a flat order list by the checkout that created them (`orderGroupId`).
+ * A cart spanning several vendors becomes one Order per vendor sharing an
+ * `orderGroupId` — this collapses them back into one unit for display, while
+ * preserving each group's first-seen position (the list is expected sorted
+ * newest-first already). Orders without an `orderGroupId` (older/legacy data)
+ * each form their own single-member group.
+ */
+export function groupOrdersByCheckout<T extends { _id: string; orderGroupId?: string }>(
+  orders: T[],
+): T[][] {
+  const groups = new Map<string, T[]>();
+  const order: string[] = [];
+  for (const o of orders) {
+    const key = o.orderGroupId ?? o._id;
+    if (!groups.has(key)) {
+      groups.set(key, []);
+      order.push(key);
+    }
+    groups.get(key)!.push(o);
+  }
+  return order.map((key) => groups.get(key)!);
+}

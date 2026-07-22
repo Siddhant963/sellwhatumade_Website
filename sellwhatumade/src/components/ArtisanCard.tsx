@@ -13,7 +13,7 @@ export default function ArtisanCard({ artisan }: { artisan: PublicArtisan }) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={artisan.avatar ?? AVATAR_PLACEHOLDER}
-            alt={artisan.name}
+            alt={`${artisan.name}, ${artisan.specialization || "artisan"} from ${artisan.location || "India"}`}
             className="w-16 h-16 rounded-full object-cover border-2 border-[#f4a460]"
           />
           {artisan.isVerified && (

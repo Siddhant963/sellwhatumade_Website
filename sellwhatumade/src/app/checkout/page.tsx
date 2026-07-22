@@ -177,7 +177,7 @@ export default function CheckoutPage() {
       // Cash on Delivery: order is confirmed immediately, no payment gateway involved.
       if (init.codConfirmed) {
         await refresh();
-        router.push(`/orders/${init.orderId}?placed=1`);
+        router.push(`/orders?group=${init.orderGroupId}&placed=1`);
         return;
       }
 
@@ -189,7 +189,7 @@ export default function CheckoutPage() {
           razorpaySignature: "dev_bypass_signature",
         });
         await refresh();
-        router.push(`/orders/${init.orderId}?placed=1`);
+        router.push(`/orders?group=${init.orderGroupId}&placed=1`);
         return;
       }
 
@@ -203,7 +203,7 @@ export default function CheckoutPage() {
         amount: init.totalPaise,
         currency: init.currency || "INR",
         name: "SellWhatUMade",
-        description: init.orderNumber ? `Order ${init.orderNumber}` : "Artisan order",
+        description: init.orders?.length ? `Order ${init.orders.map((o) => o.orderNumber).join(", ")}` : "Artisan order",
         order_id: init.razorpayOrderId,
         prefill: {
           name: user?.fullName,
@@ -219,7 +219,7 @@ export default function CheckoutPage() {
               razorpaySignature: resp.razorpay_signature,
             });
             await refresh();
-            router.push(`/orders/${init.orderId}?placed=1`);
+            router.push(`/orders?group=${init.orderGroupId}&placed=1`);
           } catch (verifyErr) {
             setError(verifyErr instanceof Error ? verifyErr.message : "Payment verification failed.");
             setPlacing(false);
